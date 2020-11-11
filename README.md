@@ -12,3 +12,13 @@ Note: The Kinect Fusion library has already implemented comprehensive photogramm
 
 Relevant papers:
 - https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/ismar2011.pdf
+
+Progress Pictures:
+
+![Image 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-001.jpg)
+
+![Image 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-003.jpg)
+
+![Image 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-004.jpg)
+
+![Image 4](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-006.jpg)
