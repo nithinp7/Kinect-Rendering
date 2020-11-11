@@ -1,8 +1,8 @@
 # Kinect-Rendering
 Project to explore the mapping and rendering of raw data retrieved using a Microsoft Kinect sensor. 
 
-This is a new and ongoing project, currently the program only streams video from the sensor. The following are the goals of this project in order:
-- Visualize the point cloud retrieved from the Kinect depth information with respect to the frustum of the virtual camera
+The following are the goals of this project in order:
+- [Completed] Visualize the point cloud retrieved from the Kinect depth information with respect to the frustum of the virtual camera
 - Use the accumulated point cloud data to calculate density and color information in a voxel grid
 - Use marching cubes implementation from a previous project to construct a triangle mesh out of the voxelized data
 - Attempt to implement photogrammetry methods to track camera movement between frames and align data from multiple camera positions
