@@ -1,6 +1,12 @@
 #ifndef SCREEN_QUAD_H
 #define SCREEN_QUAD_H
 
+#include <glad/glad.h>
+
+#include <shader.hpp>
+
+#include <vector>
+
 // quad VAO
 unsigned int quadVAO, quadVBO;
 
@@ -20,13 +26,19 @@ void initScreenQuad()
 {
 	glGenVertexArrays(1, &quadVAO);
 	glGenBuffers(1, &quadVBO);
+
 	glBindVertexArray(quadVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+}
 
+void deleteScreenQuad()
+{
+	glDeleteVertexArrays(1, &quadVAO);
+	glDeleteBuffers(1, &quadVBO);
 }
 #endif

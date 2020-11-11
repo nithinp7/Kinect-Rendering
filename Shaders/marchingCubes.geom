@@ -43,11 +43,6 @@ const int edgeToCornerTable[][2] = {
 layout(binding = 0) uniform isamplerBuffer voxels;
 layout(binding = 1) uniform isamplerBuffer triTableTex;
 
-//uniform mat4 model;
-//uniform mat4 view;
-//uniform mat4 projection;
-//uniform mat4 smd;
-
 uniform int WIDTH;
 uniform int HEIGHT;
 uniform int DEPTH;

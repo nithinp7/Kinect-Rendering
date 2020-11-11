@@ -1,7 +1,12 @@
 #ifndef SKYBOX_H
 #define SKYBOX_H
 
-Shader* skyboxShader;
+#include <glad/glad.h>
+
+#include <shader.hpp>
+#include <shaderResources.hpp>
+
+#include <vector>
 
 // load textures
 std::vector<std::string> faces =
@@ -74,19 +79,15 @@ void initSkybox()
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-	skyboxShader = new Shader("../KinectSLAM/Shaders/skybox.vert", "../KinectSLAM/Shaders/skybox.frag");
 	skyboxShader->use();
 	skyboxShader->setInt("skybox", 0);
 }
 
-void drawSkybox(glm::mat4 view, glm::mat4 projection)
+void drawSkybox()
 {
 	glDepthFunc(GL_LEQUAL);  
-	skyboxShader->use();
-	// remove translation from the view matrix
-	skyboxShader->setMat4("view", glm::mat4(glm::mat3(view)));
-	skyboxShader->setMat4("projection", projection);
 
+	skyboxShader->use();
 	glBindVertexArray(skyboxVAO);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
@@ -98,6 +99,7 @@ void drawSkybox(glm::mat4 view, glm::mat4 projection)
 
 void deleteSkybox()
 {
-	delete skyboxShader;
+	glDeleteVertexArrays(1, &skyboxVAO);
+	glDeleteBuffers(1, &skyboxVBO);
 }
 #endif

@@ -9,7 +9,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-using namespace std;
 
 #include <shader.hpp>
 
@@ -370,17 +369,17 @@ public:
 		for(int k = 0; k < depth; k += zRat)
 		{
 			//string path = "../KinectSLAM/Media/CT_Data/mrbrain-8bit0";
-			string path = "../KinectSLAM/Media/CT_Data/1-";
+			std::string path = "../KinectSLAM/Media/CT_Data/1-";
 			if (k + 1 < 100)
 				path += "0";
 			if (k + 1 < 10)
 				path += "0";
-			path += to_string(k + 1);
+			path += std::to_string(k + 1);
 			path += ".dcm.tif";
 
 			//printf("%s\n", path.c_str());
 
-			ifstream myFile(path.c_str(), ios::in | ios::binary);
+			std::ifstream myFile(path.c_str(), std::ios::in | std::ios::binary);
 			myFile.read(tmpBuf, width * height);
 			if (!myFile) {
 				// An error occurred!
@@ -401,9 +400,9 @@ public:
 	void load_data()
 	{
 		//string path = "../KinectSLAM/Media/CT_Data/rawtest.nrrd";
-		string path = "../KinectSLAM/Media/CT_Data/HEADW_unz.nrrd";
+		std::string path = "../KinectSLAM/Media/CT_Data/HEADW_unz.nrrd";
 		//string path = "../KinectSLAM/Media/CT_Data/rabbit.nrrd";
-		ifstream myFile(path.c_str(), ios::in | ios::binary);
+		std::ifstream myFile(path.c_str(), std::ios::in | std::ios::binary);
 
 		short* tmpBuf = (short*)malloc(sizeof(short) * width * height);
 		if (tmpBuf == NULL) {

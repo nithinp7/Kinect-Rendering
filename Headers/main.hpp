@@ -10,11 +10,14 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 //#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <GLFW/glfw3.h>
 
 #include <constants.hpp>
 
 #include <shader.hpp>
+#include <shaderResources.hpp>
 #include <textures.hpp>
 
 #include <screenQuad.hpp>
@@ -26,17 +29,17 @@
 #include <kinect.hpp>
 
 #include <string>
-#include <limits>
+//#include <limits>
 
 #include <math.h>    
 
-# define M_PI           3.14159265358979323846  /* pi */
+#define PI 3.14159265358979323846  /* pi */
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-void set_lighting(Shader shader, glm::vec3* pointLightPositions);
+void set_lighting(Shader* shader, glm::vec3* pointLightPositions);
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));

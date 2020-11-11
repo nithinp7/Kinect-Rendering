@@ -1,6 +1,8 @@
 #ifndef TIF_EXP_H
 #define TIF_EXP_H
 
+#include <glad/glad.h>
+
 #include <iostream>
 
 unsigned int printID = 1;
@@ -49,12 +51,12 @@ const char TIF_FOOTER[] = {
 
 void print_screen()
 {
-	string path = "../KinectSLAM/Animation/out-";
+	std::string path = "../KinectSLAM/Animation/out-";
 	if (printID < 100)
 		path += "0";
 	if (printID < 10)
 		path += "0";
-	path += to_string(printID);
+	path += std::to_string(printID);
 	path += ".tif";
 
 	char* tmpBuf = (char*)std::malloc(STRIP_SIZE);
@@ -84,7 +86,7 @@ void print_screen()
 	}
 	std::free(swapMem);
 
-	ofstream myFile(path.c_str(), ios::out | ios::binary);
+	std::ofstream myFile(path.c_str(), std::ios::out | std::ios::binary);
 	myFile.write(TIF_HEADER, 8);
 	myFile.write(tmpBuf, STRIP_SIZE);
 	myFile.write(TIF_FOOTER, sizeof(TIF_FOOTER));
