@@ -11,7 +11,6 @@ const ivec3 cornerTable [] = {
 		ivec3(0, 1, 1)
 };
 const vec3 edgeTable[][2] = {
-
 		{ vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0) },
 		{ vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0) },
 		{ vec3(0.0, 1.0, 0.0), vec3(1.0, 1.0, 0.0) },
@@ -155,7 +154,8 @@ void main()
 
 			vec3 g = -d0 * (g1 - g0) / (d1 - d0) + g0;
 
-			FragPos = 0.1 * vertPos * vec3(xRat, -yRat, 3 * zRat);
+			//FragPos = /*0.1 *  */vertPos;// * vec3(xRat, -yRat, 3 * zRat);
+			FragPos = vertPos * vec3(1.0 / WIDTH, 1.0 / HEIGHT, 1.0 / DEPTH) - vec3(0.5, 0.5, 0.5);
 			Normal = g;
 			Color = vec4(0.8, 0.4, 0.6, 1.0);
 

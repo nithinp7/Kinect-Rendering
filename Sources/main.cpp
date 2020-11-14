@@ -53,10 +53,9 @@ int main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	// build and compile shaders
-	// -------------------------
-	initShaders();
-	initSkybox();
+	shaders = ShaderResources::get_instance();
+
+	Skybox* skybox = new Skybox();
 	initScreenQuad();
 
 	// positions of the point lights
@@ -72,14 +71,15 @@ int main()
 	unsigned int smile_texture = loadTexture("../KinectSLAM/Media/textures/awesomeface.png");
 	unsigned int grey_texture = loadTexture("../KinectSLAM/Media/textures/grey.png");
 
-	// shader configuration
-	// --------------------
-	renderPassShader->use();
-	renderPassShader->setInt("material.diffuse", 0);
+	MarchingCubes* mcubes = new MarchingCubes();
+	Kinect* kinect = new Kinect();
 
 	// kinect related
-	if(!initKinect())
+	if (kinect->init_error_flag)
+	{
 		printf("Failed to init Kinect!\n");
+		exit(-1);
+	}
 
 	// render loop
 	// -----------
@@ -101,34 +101,36 @@ int main()
 		// ------
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		// draw scene as normal, get camera parameters
+
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-		//glm::mat4 model = glm::rotate(model, glm::radians(10.0f*currentFrame), glm::vec3(1.0f, 0.3f, 0.5f));
+		
+		shaders->update(view, projection);
 
-		updateShaders(view, projection);
+		set_lighting(shaders->renderPass, pointLightPositions);
 
-		set_lighting(renderPassShader, pointLightPositions);
+		if(!freezeKinect) kinect->update();
+		kinect->draw();
 
-		glBindVertexArray(0);
+		//float sc = 0.45f;
+		// 3.6 meters between the near and far plane 
+		float sc = 3.6f;
 
-		//render.Draw(marchingCubesShader, renderPassShader, threshold, updateGeom);
+		glm::mat4 model;
+		//model = glm::translate(model, glm::vec3(-10.0f, 5.0f, -50.0f));
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.2f));
+		model = glm::scale(model, glm::vec3(sc, sc, sc));
+
+		//mcubes->Draw(model, threshold, updateGeom);
 		updateGeom = false;
 
-		updateKinect();
-		drawKinect();
-
 		/*
-		if (drawNormals) {
-			normalShader.use();
-			normalShader.setMat4("projection", projection);
-			normalShader.setMat4("view", view);
-			//render.Draw(normalShader);
-		}
+		if (drawNormals) 
+			//blahblah Draw(normalShader);
 		*/
 
 		// draw skybox as last
-		drawSkybox();
+		skybox->draw();
 		
 		// save frame to file if print flag is set
 		if (print)
@@ -143,15 +145,14 @@ int main()
 		glfwPollEvents();
 	}
 
-	// optional: de-allocate all resources once they've outlived their purpose:
-	// ------------------------------------------------------------------------
-	glDeleteVertexArrays(1, &skyboxVAO);
-	glDeleteBuffers(1, &skyboxVAO);
-	//render.delete_buffers();
-	deleteKinect();
-	deleteSkybox();
-	deleteShaders();
+	// release resources  
+	delete mcubes;
+	delete kinect;
+	delete skybox;
 	deleteScreenQuad();
+
+	ShaderResources::reset_instance();
+	shaders = NULL;
 
 	glfwTerminate();
 	return 0;
@@ -175,72 +176,38 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 
-	// change stepsize multiplier (to make it less if necessary
-	if (glfwGetKey(window, GLFW_KEY_COMMA))
-		step_multiplier *= 1.01f;
-	if (glfwGetKey(window, GLFW_KEY_PERIOD))
-		step_multiplier /= 1.01f;
-
-	// update step based on framerate (prevents excessive changes)
-	float step = deltaTime * step_multiplier;
-
+	static float offsX = 0.014f, offsY = -0.004f;
 
 	// debounced button presses
 	float currentFrame = glfwGetTime();
 	bool somethingPressed = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
 	if (somethingPressed && last_pressed < currentFrame - 0.5f || last_pressed == 0.0f)
 	{
 		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS) {
-			threshold = 1;
-			updateGeom = true;
+			//threshold = 1;
+			//updateGeom = true;
+			offsY -= 0.001;
+			printf("offsY set to %f meters\n", offsY);
 		}
 		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			threshold += 20;//threshold = 90;
-			updateGeom = true;
+			//threshold += 20;//threshold = 90;
+			//updateGeom = true;
+			offsX += 0.001;
+			printf("offsX set to %f meters\n", offsX);
 		}
 		if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
 			threshold = 400;
 			updateGeom = true;
 		}
-		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-			if (quaterians)
-			{
-				quaterians = false;
-				std::cout << "Not using Quaterians" << std::endl;
-			}
-			else
-			{
-				quaterians = true;
-				std::cout << "Using Quaterians" << std::endl;
-			}
-
-		// reset all changes to 0
-		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
-		{
-			rotation_rate = glm::vec3(0.0f, 0.0f, 0.0f);
-			scale = glm::vec3(1.0f, 1.0f, 1.0f);
-			translation = glm::vec3(0.0f, 0.0f, 0.0f);
-			rotation = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
-			rotation_euler = glm::vec3(0.0f, 0.0f, 0.0f);
-			step_multiplier = 1.0f;
+		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
+			freezeKinect = !freezeKinect;
 		}
-
-		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-		{
-			rotation_rate = 20.0f*glm::vec3(PI / 64.0f, PI / 64.0f, PI / 64.0f);
-			scale = glm::vec3(2.0f, 0.5f, 0.2f);
-			translation = glm::vec3(0.0f, 0.0f, 0.0f);
-			rotation = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
-			rotation_euler = glm::vec3(0.0f, 0.0f, 0.0f);
-		}
-
-		// Print all info
+		// Print screenshot
 		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
 		{
 			print = true;
@@ -250,42 +217,14 @@ void processInput(GLFWwindow *window)
 		last_pressed = currentFrame;
 	}
 
+	// TODO: remove this (FOR DEBUG ONLY)
+	shaders->kinectPointCloud->use();
+	shaders->kinectPointCloud->setFloat("offsX", offsX);
+	shaders->kinectPointCloud->setFloat("offsY", offsY);
 	
-	if (glfwGetKey(window, GLFW_KEY_COMMA) || glfwGetKey(window, GLFW_KEY_PERIOD))
-		std::printf("Step: %.05f\tStep Multiplier: %.04f\\tFrame Rate: %.05f\n", step, step_multiplier, framerate);
-
-	// Make changes depending on the key
-	glm::vec3 change;
-	if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
-		change.x += step;
-	if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
-		change.y += step;
-	if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
-		change.z += step;
-	if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
-		change.x -= step;
-	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
-		change.y -= step;
-	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-		change.z -= step;
-
-
-
-	// figure out what to change
-	bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT);
-	bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL);
-
-	// update rotation rate
-	if (!shift && !ctrl)
-		rotation_rate += change;
-
-	// update scale
-	if (shift && !ctrl)
-		scale += scale * change * deltaTime * 1e2f;
-
-	// update translation
-	if (!shift && ctrl)
-		translation += change * deltaTime * 1e2f;
+	// modifiers if needed
+	// bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT);
+	// bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes

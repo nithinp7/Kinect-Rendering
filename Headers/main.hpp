@@ -24,7 +24,7 @@
 #include <skybox.hpp>
 
 #include <camera.hpp>
-#include <render.hpp>
+#include <marchingCubes.hpp>
 #include <tifExport.hpp>
 #include <kinect.hpp>
 
@@ -41,6 +41,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 void set_lighting(Shader* shader, glm::vec3* pointLightPositions);
 
+// global shader manager
+ShaderResources* shaders;
+
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = (float)SCR_WIDTH / 2.0;
@@ -56,16 +59,6 @@ float framerate = 0.0f;
 bool drawNormals = false;
 bool quaterians = false;
 
-// Transformation Matrices
-glm::vec3 translation   = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 rotation_rate = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 rotation_euler      = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::quat rotation   =   glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
-glm::vec3 scale         = glm::vec3(1.0f, 1.0f, 1.0f);
-
-// Step size of transformations
-float step_multiplier = 0.1f;
-
 // Last Press
 float last_pressed = 0.0f;
 
@@ -74,5 +67,7 @@ bool animate = false;
 
 int threshold = 1;
 bool updateGeom = false;
+//TODO: change name cmon
+bool freezeKinect = false;
 
 #endif 
