@@ -17,6 +17,8 @@ Progress:
 
 Align color and depth cameras, create point cloud from fused data, and render point cloud.
 
+YouTube link: https://youtu.be/TrRJwSSkSFM
+
 ![Image 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-001.jpg)
 
 ![Image 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-003.jpg)
