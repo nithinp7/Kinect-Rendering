@@ -62,13 +62,10 @@ int cube[8];
 
 int get_voxel(int x, int y, int z)
 {
-	//x = (x + WIDTH / 2) % WIDTH;
-	//y = (HEIGHT - y);
-
-	//return voxels[z * WIDTH * HEIGHT + y * WIDTH + x];
 	return int(texelFetch(voxels, z * WIDTH * HEIGHT + y * WIDTH + x).r);
 }
 
+// TODO: might not need safe access, texelFetch might be able to wrap automatically 
 float get_voxel_safe(int x, int y, int z) {
 
 	if (x < 0 || y < 0 || z < 0 ||

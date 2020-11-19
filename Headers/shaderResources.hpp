@@ -18,6 +18,8 @@ public:
 	Shader* skybox;
 	Shader* kinectPointCloud;
 	Shader* kinectDepthTexture;
+	Shader* kinectVoxelize;
+	Shader* test;
 
 	static ShaderResources* get_instance();
 	static void reset_instance();

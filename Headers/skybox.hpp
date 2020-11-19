@@ -6,7 +6,7 @@
 #include <shader.hpp>
 #include <shaderResources.hpp>
 
-#include <textures.hpp>
+#include <resourcesLoader.hpp>
 
 #include <vector>
 

@@ -18,9 +18,9 @@
 
 #include <shader.hpp>
 #include <shaderResources.hpp>
-#include <textures.hpp>
+#include <resourcesLoader.hpp>
 
-#include <screenQuad.hpp>
+//#include <screenQuad.hpp>
 #include <skybox.hpp>
 
 #include <camera.hpp>
@@ -29,7 +29,7 @@
 #include <kinect.hpp>
 
 #include <string>
-//#include <limits>
+#include <limits>
 
 #include <math.h>    
 
@@ -57,7 +57,7 @@ float framerate = 0.0f;
 
 // booleans for doing different things
 bool drawNormals = false;
-bool quaterians = false;
+bool debugPrint = false;
 
 // Last Press
 float last_pressed = 0.0f;

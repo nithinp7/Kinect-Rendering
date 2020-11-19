@@ -64,7 +64,7 @@ void main()
     // if transparent uncomment this 
     //FragColor = vec4(result, 0.3) * Color;
     FragColor = vec4(result, 1) * Color;
-
+    //FragColor = vec4(norm, 1);
 	//FragColor = texture(material.diffuse, TexCoords);
     /**/
 }

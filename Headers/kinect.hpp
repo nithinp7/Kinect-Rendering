@@ -9,6 +9,9 @@
 
 #include <shader.hpp>
 #include <shaderResources.hpp>
+#include <resourcesLoader.hpp>
+
+#include <marchingCubes.hpp>
 
 #include <math.h>
 
@@ -24,10 +27,21 @@ public:
 	~Kinect();
 	void update();
 	void draw();
+	void debugDump();
 
 private:
+
 	// global shader manager
 	ShaderResources* shaders;
+
+	// custom compute shader
+	GLuint kinectVoxelizeShader;
+
+	// marching cubes and voxelization related
+	MarchingCubes* mcubes;
+	glm::mat4 mcubes_model;
+	glm::mat4 mcubes_model_inv;
+
 
 	// camera textures
 	struct camera_tex_vertex {
@@ -37,7 +51,9 @@ private:
 
 	struct frustum {
 		float vfov;
+		float tan_half_vfov;
 		float hfov;
+		float tan_half_hfov;
 		glm::vec3 verts[9];
 		glm::vec3 lines[24];
 		glm::vec4 color;
@@ -89,7 +105,9 @@ private:
 	frustum depth_frustum;
 
 	// point cloud
-	glm::vec2* point_cloud_verts;
+	glm::ivec2* point_cloud_verts;
+	glm::vec4* point_cloud_out_buf;
+	GLuint point_cloud_out_tex;
 	int points_width = -1;
 	int points_height = -1;
 	const int x_points_per_pix = 5;

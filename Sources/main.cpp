@@ -20,8 +20,9 @@ int main()
 #endif
 
 	std:printf(preamble.c_str());
-														 // glfw window creation
-														 // --------------------
+
+	// glfw window creation
+	// --------------------
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Kinect SLAM", NULL, NULL);
 	if (window == NULL)
 	{
@@ -56,7 +57,6 @@ int main()
 	shaders = ShaderResources::get_instance();
 
 	Skybox* skybox = new Skybox();
-	initScreenQuad();
 
 	// positions of the point lights
 	glm::vec3 pointLightPositions[] = {
@@ -66,18 +66,10 @@ int main()
 		glm::vec3(0.0f,  0.0f, -3.0f)
 	};
 
-	//Render render = Render();
-	unsigned int box_texture = loadTexture("../KinectSLAM/Media/textures/container.jpg");
-	unsigned int smile_texture = loadTexture("../KinectSLAM/Media/textures/awesomeface.png");
-	unsigned int grey_texture = loadTexture("../KinectSLAM/Media/textures/grey.png");
-
-	MarchingCubes* mcubes = new MarchingCubes();
 	Kinect* kinect = new Kinect();
-
-	// kinect related
 	if (kinect->init_error_flag)
 	{
-		printf("Failed to init Kinect!\n");
+		printf("Failed to initialize Kinect!\n");
 		exit(-1);
 	}
 
@@ -112,18 +104,6 @@ int main()
 		if(!freezeKinect) kinect->update();
 		kinect->draw();
 
-		//float sc = 0.45f;
-		// 3.6 meters between the near and far plane 
-		float sc = 3.6f;
-
-		glm::mat4 model;
-		//model = glm::translate(model, glm::vec3(-10.0f, 5.0f, -50.0f));
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.2f));
-		model = glm::scale(model, glm::vec3(sc, sc, sc));
-
-		//mcubes->Draw(model, threshold, updateGeom);
-		updateGeom = false;
-
 		/*
 		if (drawNormals) 
 			//blahblah Draw(normalShader);
@@ -131,12 +111,18 @@ int main()
 
 		// draw skybox as last
 		skybox->draw();
-		
+
 		// save frame to file if print flag is set
 		if (print)
 		{
 			print_screen();
 			print = false;
+		}
+
+		if (debugPrint)
+		{
+			kinect->debugDump();
+			debugPrint = false;
 		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -146,10 +132,8 @@ int main()
 	}
 
 	// release resources  
-	delete mcubes;
 	delete kinect;
 	delete skybox;
-	deleteScreenQuad();
 
 	ShaderResources::reset_instance();
 	shaders = NULL;
@@ -176,6 +160,7 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 
+	// TODO: get rid of this
 	static float offsX = 0.014f, offsY = -0.004f;
 
 	// debounced button presses
@@ -201,8 +186,9 @@ void processInput(GLFWwindow *window)
 			printf("offsX set to %f meters\n", offsX);
 		}
 		if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
-			threshold = 400;
-			updateGeom = true;
+			//threshold = 400;
+			//updateGeom = true;
+			debugPrint = true;
 		}
 		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
 			freezeKinect = !freezeKinect;
@@ -212,7 +198,6 @@ void processInput(GLFWwindow *window)
 		{
 			print = true;
 		}
-
 
 		last_pressed = currentFrame;
 	}
@@ -319,9 +304,9 @@ void set_lighting(Shader* shader, glm::vec3* pointLightPositions)
 	shader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
 	shader->setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
 	shader->setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-	shader->setFloat("spotLight.constant", 0.0f);
-	shader->setFloat("spotLight.linear", 0.001f);
-	shader->setFloat("spotLight.quadratic", 0.0009f);
+	shader->setFloat("spotLight.constant", 1.0f);
+	shader->setFloat("spotLight.linear", 0.01f);
+	shader->setFloat("spotLight.quadratic", 0.009f);
 	shader->setFloat("spotLight.cutOff", glm::cos(glm::radians(17.5f)));
 	shader->setFloat("spotLight.outerCutOff", glm::cos(glm::radians(22.0f)));
 
