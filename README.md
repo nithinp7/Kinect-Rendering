@@ -13,7 +13,9 @@ Note: The Kinect Fusion library has already implemented comprehensive photogramm
 Relevant papers:
 - https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/ismar2011.pdf
 
-Progress Pictures:
+Progress:
+
+Align color and depth cameras, create point cloud from fused data, and render point cloud.
 
 ![Image 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-001.jpg)
 
@@ -22,3 +24,7 @@ Progress Pictures:
 ![Image 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-004.jpg)
 
 ![Image 4](https://github.com/nithinp7/Kinect-Rendering/blob/main/out-006.jpg)
+
+Basic integration of marching cubes. So far, transfers density from point cloud only into a simple boolean voxel field (notice blocky geometry).
+
+![Image 5](https://github.com/nithinp7/Kinect-Rendering/blob/main/Kinect%20SLAM%2011_18_2020%208_49_48%20PM.png)
