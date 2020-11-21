@@ -14,11 +14,8 @@
 #include <shaderResources.hpp>
 
 struct Vertex {
-	// position
 	glm::vec3 Position;
-	// normal
 	glm::vec3 Normal;
-	// texCoords
 	glm::vec4 Color;
 };
 
@@ -317,14 +314,14 @@ class MarchingCubes
 public:
 
 	int width, height, depth;
-	//TODO: standardize, replace, or remove ratios
-	int xRat, yRat, zRat;
+	int grid_size;
 	int num_cells;
 
 	short* voxels;
-	int* grid;
+	unsigned int* voxel_colors;
+	int* cells_verts;
 
-	MarchingCubes(int w, int h, int d, int xr = 1, int yr = 1, int zr = 1);
+	MarchingCubes(int w, int h, int d);
 	~MarchingCubes();
 	void set_voxel(int x, int y, int z, short val);
 	void updateGeometry(int threshold, bool reupload_voxels);
@@ -332,10 +329,9 @@ public:
 
 private:
 
-	/*  Render data  */
 	unsigned int TVAO, VAO, boxVAO, TFO, TBO, VBO, boxVBO;
-	unsigned int buf, buf2;
-	unsigned int txtr, txtr2;
+	unsigned int voxels_buf, voxel_colors_buf, tri_table_buf;
+	unsigned int voxels_txt, voxel_colors_txt, tri_table_txt;
 
 	ShaderResources* shaders;
 
@@ -343,9 +339,6 @@ private:
 	unsigned int query;
 
 	void setup();
-	//TODO: get rid of this
-	void load_data2();
-	void load_data();
 };
 
 #endif

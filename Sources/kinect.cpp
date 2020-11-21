@@ -49,7 +49,7 @@ Kinect::Kinect()
 	depth_frustum.hfov = hfov_deg / 180.0f * PI;
 
 	shaders = ShaderResources::get_instance();
-	mcubes = new MarchingCubes(150, 150, 150);
+	mcubes = new MarchingCubes(200, 200, 200);
 
 	float sc = (far_plane - near_plane) * 0.5f;
 	mcubes_model = glm::mat4();
@@ -100,7 +100,7 @@ Kinect::Kinect()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, points_width, points_height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2 * points_width, points_height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glBindImageTexture(0, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	shaders->kinectDepthTexture->use();
@@ -122,6 +122,9 @@ Kinect::Kinect()
 
 	// TODO: move to different spot?
 	shaders->kinectVoxelize->setMat4("mcubes_model_inv", mcubes_model_inv);
+	shaders->kinectVoxelize->setInt("mcubes_width", mcubes->width);
+	shaders->kinectVoxelize->setInt("mcubes_height", mcubes->height);
+	shaders->kinectVoxelize->setInt("mcubes_depth", mcubes->depth);
 	//shaders->kinectVoxelize->setInt("img_output", 2);
 
 	shaders->texture->use();
@@ -135,6 +138,8 @@ Kinect::~Kinect()
 	free(point_cloud_verts);
 	free(kinect_color_data);
 	free(kinect_depth_data);
+	free(cell_buckets_heads);
+	free(cell_buckets_nodes);
 	glDeleteVertexArrays(1, &color_frustum.VAO);
 	glDeleteVertexArrays(1, &depth_frustum.VAO);
 	glDeleteVertexArrays(1, &color_frustum.camVAO);
@@ -174,9 +179,18 @@ void Kinect::draw()
 	glBindVertexArray(depth_frustum.VAO);
 	glDrawArrays(GL_LINES, 0, 24);
 
-	shaders->texture->use();
-	shaders->texture->setMat4("model", model);
+	/*
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+	shaders->kinectDepthTexture->use();
+	shaders->kinectDepthTexture->setMat4("model", model);
 	glBindVertexArray(depth_frustum.camVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	*/
+
+	//shaders->texture->use();
+	//shaders->texture->setMat4("model", model);
+	//glBindVertexArray(depth_frustum.camVAO);
 	//glDrawArrays(GL_TRIANGLES, 0, 6);
 	
 	shaders->kinectPointCloud->use();
@@ -287,15 +301,15 @@ void Kinect::createPointCloud()
 	shaders->kinectVoxelize->setInt("points_width", points_width);
 	shaders->kinectVoxelize->setInt("points_height", points_height);
 
+	point_cloud_out_buf = (glm::vec4*) malloc(sizeof(glm::vec4) * 2 * points_width * points_height);
+	cell_buckets_heads = (int*) malloc(sizeof(int) * mcubes->num_cells);
+	cell_buckets_nodes = (int*) malloc(sizeof(int) * points_width * points_height);
+
 	point_cloud_verts = (glm::ivec2*) malloc(sizeof(glm::ivec2) * points_width * points_height);
 
 	for (int x = 0; x < points_width; x++)
 		for (int y = 0; y < points_height; y++) 
 			point_cloud_verts[y * points_width + x] = glm::ivec2(x, y);
-
-	point_cloud_out_buf = (glm::vec4*) malloc(sizeof(glm::vec4) * points_width * points_height);
-	for (int i = 0; i < points_width * points_height; i++) 
-		point_cloud_out_buf[i] = glm::vec4(0, 1, 0, 1);
 
 	glGenVertexArrays(1, &pointCloudVAO);
 	glGenBuffers(1, &pointCloudVBO);
@@ -322,6 +336,11 @@ void Kinect::fetchData()
 
 void Kinect::debugDump() 
 {
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+
 	glm::mat4 model;
 
 	shaders->kinectVoxelize->use();
@@ -332,38 +351,114 @@ void Kinect::debugDump()
 
 	glDispatchCompute((GLuint)points_width, (GLuint)points_height, (GLuint)1);
 
-	// TODO: use correct barrier bit
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	shaders->texture->use();
-	shaders->texture->setInt("tex", 2);
+	//shaders->texture->use();
+	//shaders->texture->setInt("tex", 2);
 
 	glActiveTexture(GL_TEXTURE2);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, point_cloud_out_buf);
 
+	// fill voxel buckets, each bucket is a linked list representing the points from the point cloud that landed in that cell
+
+	// reset voxel buckets linked lists
+	memset(cell_buckets_heads, 0xff, sizeof(int) * mcubes->num_cells);
+	memset(cell_buckets_nodes, 0xff, sizeof(int) * points_width * points_height);
+
 	for (int i = 0; i < points_width * points_height; i++) {
-		glm::vec3 val = glm::vec3(point_cloud_out_buf[i]);
-		glm::ivec3 cell = glm::ivec3(int(val.x * mcubes->width), int(val.y * mcubes->height), int(val.z * mcubes->depth));
-		
-		mcubes->set_voxel(cell.x, cell.y, cell.z, 50);
-		mcubes->set_voxel(cell.x + 1, cell.y, cell.z, 50);
-		mcubes->set_voxel(cell.x + 1, cell.y + 1, cell.z, 50);
-		mcubes->set_voxel(cell.x, cell.y + 1, cell.z, 50);
+		glm::ivec3 cell = point_cloud_out_buf[2 * i];
 
-		mcubes->set_voxel(cell.x, cell.y, cell.z + 1, 50);
-		mcubes->set_voxel(cell.x + 1, cell.y, cell.z + 1, 50);
-		mcubes->set_voxel(cell.x + 1, cell.y + 1, cell.z + 1, 50);
-		mcubes->set_voxel(cell.x, cell.y + 1, cell.z + 1, 50);
-	}
+		if (cell.x < 0 || cell.y < 0 || cell.z < 0 ||
+			cell.x >= (mcubes->width - 1) || cell.y >= (mcubes->height - 1) || cell.z >= (mcubes->depth - 1))
+			continue;
 
-	mcubes->updateGeometry(25, true);
-	/*
-	printf("\nDEBUG DUMP STARTED:\n\n");
-	for (int i = 0; i < 50; i++) {
-		glm::vec4 val = point_cloud_out_buf[points_width * i + i];
-		printf("\t(%f, %f, %f, %f)\n", val.r, val.g, val.b, val.a);
+		int cell_index = (mcubes->width - 1) * (mcubes->height - 1) * cell.z + (mcubes->width - 1) * cell.y + cell.x;
+		// put the current head of the cell list as the next for this point node 
+		cell_buckets_nodes[i] = cell_buckets_heads[cell_index];
+		// put this point node as the new head of the cell list
+		cell_buckets_heads[cell_index] = i;
 	}
-	printf("\nDEBUG DUMP ENDED\n");
-	*/
-	//exit(0);
+	
+	static auto density_contribution_from_cell = [this](int vx, int vy, int vz, int cx, int cy, int cz, float* density_sum, glm::vec4* color_sum)
+	{
+		int cell_index = (cz * (mcubes->height - 1) + cy) * (mcubes->width - 1) + cx;
+		int next = cell_buckets_heads[cell_index];
+
+		while (next != -1)
+		{
+			glm::vec3 pos = point_cloud_out_buf[2 * next];
+			glm::vec4 color = point_cloud_out_buf[2 * next + 1];
+
+			float dif = glm::length(pos - glm::vec3(vx, vy, vz)) / 2;
+			float w = (1 + 3 * dif) * powf(1 - dif, 3);
+
+			if (dif < 1) {
+				*density_sum += 15.0f * w;
+				*color_sum += 10.0f * color * w;
+			}
+			//*color_sum = color;
+			next = cell_buckets_nodes[next];
+		}
+	};
+
+	static auto check_cell_in_bounds = [this](int cx, int cy, int cz) -> bool
+	{
+		return cx >= 0 && cy >= 0 && cz >= 0 && cx < mcubes->width - 1 && cy < mcubes->height - 1 && cz < mcubes->depth  - 1;
+	};
+
+	// TODO: fix iteration order (cache efficiency?)
+	// TODO: add voxel density calculation on borders as well 
+	for (int x = 0; x < mcubes->width; x++)
+		for (int y = 0; y < mcubes->height; y++)
+			for (int z = 0; z < mcubes->depth; z++) {
+				int index = (z * mcubes->height + y) * mcubes->width + x;
+				float density = 0.0f;
+				// TODO: consider initializing alpha value to 1.0
+				glm::vec4 color = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+				int kernel_size = 2;
+
+				for (int kx = -kernel_size; kx < kernel_size; kx++)
+					for (int ky = -kernel_size; ky < kernel_size; ky++)
+						for (int kz = -kernel_size; kz < kernel_size; kz++)
+							if (check_cell_in_bounds(x + kx, y + ky, z + kz))
+								density_contribution_from_cell(x, y, z, x + kx, y + ky, z + kz, &density, &color);
+
+				/*
+				if (check_cell_in_bounds(x, y, z))
+					density_contribution_from_cell(x, y, z, x, y, z, &density, &color);
+				if (check_cell_in_bounds(x - 1, y, z))
+					density_contribution_from_cell(x, y, z, x - 1, y, z, &density, &color);
+				if (check_cell_in_bounds(x - 1, y - 1, z))
+					density_contribution_from_cell(x, y, z, x - 1, y - 1, z, &density, &color);
+				if (check_cell_in_bounds(x, y - 1, z))
+					density_contribution_from_cell(x, y, z, x, y - 1, z, &density, &color);
+
+				if (check_cell_in_bounds(x, y, z - 1))
+					density_contribution_from_cell(x, y, z, x, y, z - 1, &density, &color);
+				if (check_cell_in_bounds(x - 1, y, z - 1))
+					density_contribution_from_cell(x, y, z, x - 1, y, z - 1, &density, &color);
+				if (check_cell_in_bounds(x - 1, y - 1, z - 1))
+					density_contribution_from_cell(x, y, z, x - 1, y - 1, z - 1, &density, &color);
+				if (check_cell_in_bounds(x, y - 1, z - 1))
+					density_contribution_from_cell(x, y, z, x, y - 1, z - 1, &density, &color);
+					*/
+
+				// TODO: find better color than black to assign if alpha < EPSILON (maybe set density to zero?)
+				// TODO: normalize in shader, so color can be stochastically accumulated with additional point cloud data 
+				
+				if (color.a > EPSILON)
+					color = color / color.a;
+				color *= 255.0f;
+				//color = glm::vec4(255.0f, 100.0f, 50.0f, 255.0f);
+
+				unsigned int color_packed = ((unsigned int)(unsigned char)color.r) << 24 | 
+											((unsigned int)(unsigned char)color.g) << 16 | 
+											((unsigned int)(unsigned char)color.b) << 8 | 
+											0xff;
+				
+				mcubes->voxels[index] = short(density);
+				mcubes->voxel_colors[index] = color_packed;
+			}
+
+	mcubes->updateGeometry(50, true);
 }

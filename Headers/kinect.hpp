@@ -16,6 +16,7 @@
 #include <math.h>
 
 #define PI 3.14159265358979323846  /* pi */
+#define EPSILON 1e-4f
 
 class Kinect {
 	 
@@ -34,14 +35,17 @@ private:
 	// global shader manager
 	ShaderResources* shaders;
 
-	// custom compute shader
+	// custom compute shader, creates point cloud and transforms
 	GLuint kinectVoxelizeShader;
 
 	// marching cubes and voxelization related
 	MarchingCubes* mcubes;
 	glm::mat4 mcubes_model;
 	glm::mat4 mcubes_model_inv;
-
+	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
+	int* cell_buckets_heads;
+	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
+	int* cell_buckets_nodes;
 
 	// camera textures
 	struct camera_tex_vertex {
@@ -110,8 +114,8 @@ private:
 	GLuint point_cloud_out_tex;
 	int points_width = -1;
 	int points_height = -1;
-	const int x_points_per_pix = 5;
-	const int y_points_per_pix = 5;
+	const int x_points_per_pix = 2;
+	const int y_points_per_pix = 2;
 	unsigned int pointCloudVAO;
 	unsigned int pointCloudVBO;
 

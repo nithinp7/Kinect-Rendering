@@ -40,15 +40,12 @@ const int edgeToCornerTable[][2] = {
 };
 
 layout(binding = 0) uniform isamplerBuffer voxels;
-layout(binding = 1) uniform isamplerBuffer triTableTex;
+layout(binding = 1) uniform isamplerBuffer voxels_col;
+layout(binding = 2) uniform isamplerBuffer triTableTex;
 
 uniform int WIDTH;
 uniform int HEIGHT;
 uniform int DEPTH;
-
-uniform int xRat;
-uniform int yRat;
-uniform int zRat;
 
 uniform int threshold;
 
@@ -59,10 +56,16 @@ out vec3 Normal;
 out vec4 Color;
 
 int cube[8];
+unsigned int cols[8];
 
 int get_voxel(int x, int y, int z)
 {
 	return int(texelFetch(voxels, z * WIDTH * HEIGHT + y * WIDTH + x).r);
+}
+
+unsigned int get_color(int x, int y, int z)
+{
+	return unsigned int(texelFetch(voxels_col, z * WIDTH * HEIGHT + y * WIDTH + x).r);
 }
 
 // TODO: might not need safe access, texelFetch might be able to wrap automatically 
@@ -81,6 +84,7 @@ void get_cube(ivec3 upos)
 	{
 		ivec3 v = upos + cornerTable[i];
 		cube[i] = get_voxel(v.x, v.y, v.z);
+		cols[i] = get_color(v.x, v.y, v.z);
 	}
 }
 
@@ -141,10 +145,18 @@ void main()
 			float d0 = cube[i0] - threshold;
 			float d1 = cube[i1] - threshold;
 
+			unsigned int col0_int = cols[i0];
+			unsigned int col1_int = cols[i1];
+
+			vec4 col0 = vec4(col0_int >> 24, col0_int >> 16 & 0xff, col0_int >> 8 & 0xff, col0_int & 0xff);
+			vec4 col1 = vec4(col1_int >> 24, col1_int >> 16 & 0xff, col1_int >> 8 & 0xff, col1_int & 0xff);
+
 			vec3 v0 = edgeTable[index][0];
 			vec3 v1 = edgeTable[index][1];
 						
 			vec3 vertPos = offs + pos + -d0 * (v1 - v0) / (d1 - d0) + v0;
+			Color = -d0 * (col1 - col0) / (d1 - d0) + col0;
+			Color = vec4(Color.rgb / 255.0, 1);
 
 			vec3 g0 = get_gradient(gridPos[0].x + c0.x, gridPos[0].y + c0.y, gridPos[0].z + c0.z);
 			vec3 g1 = get_gradient(gridPos[0].x + c1.x, gridPos[0].y + c1.y, gridPos[0].z + c1.z);
@@ -154,7 +166,7 @@ void main()
 			//FragPos = /*0.1 *  */vertPos;// * vec3(xRat, -yRat, 3 * zRat);
 			FragPos = vertPos * vec3(1.0 / WIDTH, 1.0 / HEIGHT, 1.0 / DEPTH) - vec3(0.5, 0.5, 0.5);
 			Normal = g;
-			Color = vec4(0.8, 0.4, 0.6, 1.0);
+			//Color = vec4(0.8, 0.4, 0.6, 1.0);
 
 			EmitVertex();
 						

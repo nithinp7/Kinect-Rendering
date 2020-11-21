@@ -1,47 +1,42 @@
 
 #include <marchingCubes.hpp>
 
-MarchingCubes::MarchingCubes(int w, int h, int d, int xr, int yr, int zr)
+MarchingCubes::MarchingCubes(int w, int h, int d)
 {
 	width = w;
 	height = h;
 	depth = d;
-	xRat = xr;
-	yRat = yr;
-	zRat = zr;
 
-	num_cells = width / xRat * height / yRat * depth / zRat;
+	grid_size = width * height * depth;
+	num_cells = (width - 1) * (height - 1) * (depth - 1);
 
-	//voxels = (char*) malloc(sizeof(char) * width / xRat * height / yRat * depth / zRat);
-	voxels = (short*) malloc(sizeof(short) * num_cells);
-	//load_data();
-	grid = (int*) malloc(sizeof(int) * num_cells);
-	for (int i = 0; i < num_cells; i++)
-		grid[i] = i;
+	//voxels = (char*) malloc(sizeof(char) * num_cells);
+	voxels = (short*) malloc(sizeof(short) * grid_size);
+	voxel_colors = (unsigned int*) malloc(sizeof(unsigned int) * grid_size);
+	cells_verts = (int*) malloc(sizeof(int) * num_cells);
+
+	for (int i = 0; i < num_cells; i++) 
+		cells_verts[i] = i;
 
 	setup();
 
 	shaders = ShaderResources::get_instance();
 
 	shaders->renderPass->use();
-	shaders->renderPass->setInt("material.diffuse", 0);
 
 	// Set material properties
+	shaders->renderPass->setInt("material.diffuse", 0);
 	shaders->renderPass->setVec3("material.specular", 0.3f, 0.3f, 0.3f);
 	shaders->renderPass->setFloat("material.shininess", 64.0f);
 
 	shaders->marchingCubes->use();
 
-	shaders->marchingCubes->setInt("WIDTH", width / xRat);
-	shaders->marchingCubes->setInt("HEIGHT", height / yRat);
-	shaders->marchingCubes->setInt("DEPTH", depth / zRat);
-
-	shaders->marchingCubes->setInt("xRat", xRat);
-	shaders->marchingCubes->setInt("yRat", yRat);
-	shaders->marchingCubes->setInt("zRat", zRat);
+	shaders->marchingCubes->setInt("WIDTH", width);
+	shaders->marchingCubes->setInt("HEIGHT", height);
+	shaders->marchingCubes->setInt("DEPTH", depth);
 
 	// initial geometry pass
-	updateGeometry(1, false);
+	updateGeometry(100, true);
 }
 
 MarchingCubes::~MarchingCubes()
@@ -49,13 +44,23 @@ MarchingCubes::~MarchingCubes()
 	glDeleteVertexArrays(1, &TVAO);
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteVertexArrays(1, &boxVAO);
+
 	glDeleteTransformFeedbacks(1, &TFO);
+
+	glDeleteTextures(1, &voxels_txt);
+	glDeleteTextures(1, &voxel_colors_txt);
+	glDeleteTextures(1, &tri_table_txt);
+
 	glDeleteBuffers(1, &TBO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &boxVBO);
+	glDeleteBuffers(1, &voxels_buf);
+	glDeleteBuffers(1, &voxel_colors_buf);
+	glDeleteBuffers(1, &tri_table_buf);
 
 	free(voxels);
-	free(grid);
+	free(voxel_colors);
+	free(cells_verts);
 }
 
 void MarchingCubes::set_voxel(int x, int y, int z, short val)
@@ -65,101 +70,32 @@ void MarchingCubes::set_voxel(int x, int y, int z, short val)
 		voxels[z * width * height + y * width + x] = val;
 }
 
-void MarchingCubes::load_data2()
-{
-	char* tmpBuf = (char*)malloc(sizeof(char) * width * height);
-
-	for (int k = 0; k < depth; k += zRat)
-	{
-		//string path = "../KinectSLAM/Media/CT_Data/mrbrain-8bit0";
-		std::string path = "../KinectSLAM/Media/CT_Data/1-";
-		if (k + 1 < 100)
-			path += "0";
-		if (k + 1 < 10)
-			path += "0";
-		path += std::to_string(k + 1);
-		path += ".dcm.tif";
-
-		//printf("%s\n", path.c_str());
-
-		std::ifstream myFile(path.c_str(), std::ios::in | std::ios::binary);
-		myFile.read(tmpBuf, width * height);
-		if (!myFile) {
-			// An error occurred!
-			// myFile.gcount() returns the number of bytes read.
-			// calling myFile.clear() will reset the stream state
-			// so it is usable again.
-			printf("Unable to read CT Data File: %s, Bytes read: %d\n", path.c_str(), myFile.gcount());
-		}
-		for (int i = 0; i < width; i += xRat)
-			for (int j = 0; j < height; j += yRat)
-				voxels[k / zRat * width / xRat * height / yRat + i / xRat * height / yRat + j / yRat] =
-				tmpBuf[i * height + j];
-	}
-
-	free(tmpBuf);
-}
-
-void MarchingCubes::load_data()
-{
-	//string path = "../KinectSLAM/Media/CT_Data/rawtest.nrrd";
-	std::string path = "../KinectSLAM/Media/CT_Data/HEADW_unz.nrrd";
-	//string path = "../KinectSLAM/Media/CT_Data/rabbit.nrrd";
-	std::ifstream myFile(path.c_str(), std::ios::in | std::ios::binary);
-
-	short* tmpBuf = (short*)malloc(sizeof(short) * width * height);
-	if (tmpBuf == NULL) {
-		printf("Not enough memory, unable to load data.\n");
-		exit(-1);
-	}
-
-	for (int k = 0; k < depth; k += zRat)
-	{
-		myFile.seekg(sizeof(short) * k * width * height);
-		myFile.read((char*)tmpBuf, sizeof(short) * width * height);
-
-		if (!myFile)
-		{
-			printf("Unable to read CT Data File: %s, Bytes read: %d\n", path.c_str(), myFile.gcount());
-			myFile.close();
-			return;
-		}
-
-		//downsample by factor of xRat * yRat
-		for (int i = 0; i < width; i += xRat)
-			for (int j = 0; j < height; j += yRat)
-			{
-				short sum = 0;
-				for (int kernx = 0; kernx < xRat; kernx++)
-					for (int kerny = 0; kerny < yRat; kerny++)
-						sum += tmpBuf[(i + kernx) * height + j + kerny];
-				voxels[k / zRat * width / xRat * height / yRat + i / xRat * height / yRat + j / yRat] = sum / xRat / yRat;
-			}
-	}
-
-	free(tmpBuf);
-
-	myFile.close();
-}
-
 void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 {
 	shaders->marchingCubes->use();
 	shaders->marchingCubes->setInt("threshold", threshold);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_BUFFER, txtr);
-
-	// reupload voxels
+	glBindTexture(GL_TEXTURE_BUFFER, voxels_txt);
+	
 	if (reupload_voxels)
 	{
-		glBindBuffer(GL_TEXTURE_BUFFER, buf);
-		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(short) * num_cells, voxels);
+		glBindBuffer(GL_TEXTURE_BUFFER, voxels_buf);
+		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(short) * grid_size, voxels);
 	}
-
+	
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_BUFFER, txtr2);
+	glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
 
+	if (reupload_voxels)
+	{
+		glBindBuffer(GL_TEXTURE_BUFFER, voxel_colors_buf);
+		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(unsigned int) * grid_size, voxel_colors);
+	}
+	
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_BUFFER, tri_table_txt);
+	
 	glEnable(GL_RASTERIZER_DISCARD);
 	//glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query);
 	glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TFO);
@@ -171,7 +107,7 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 
 	//glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
 	glDisable(GL_RASTERIZER_DISCARD);
-	glFlush();
+	glFinish();
 	//glGetQueryObjectuiv(query, GL_QUERY_RESULT, &primitives);
 	//printf("primitives count: %d\n", primitives);
 }
@@ -202,40 +138,51 @@ void MarchingCubes::draw(glm::mat4 model)
 
 void MarchingCubes::setup()
 {
-	// grid positions vertex array for the marching cubes geometry shader
+	// cells vertex array for the marching cubes geometry shader (executes per each cell)
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(int) * num_cells, grid, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(int) * num_cells, cells_verts, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribIPointer(0, 1, GL_INT/*, GL_FALSE*/, sizeof(int), (void*)0);
 
 
 	// send voxel data as a texture
-	glGenBuffers(1, &buf);
-	glGenTextures(1, &txtr);
+	glGenBuffers(1, &voxels_buf);
+	glGenTextures(1, &voxels_txt);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindBuffer(GL_TEXTURE_BUFFER, buf);
-	glBufferData(GL_TEXTURE_BUFFER, sizeof(short) * num_cells, nullptr, GL_DYNAMIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, txtr);
+	glBindBuffer(GL_TEXTURE_BUFFER, voxels_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(short) * grid_size, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, voxels_txt);
 	//glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, buf);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R16I, buf);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R16I, voxels_buf);
 
+	/* */
+	// send voxel color data as a texture
+	glGenBuffers(1, &voxel_colors_buf);
+	glGenTextures(1, &voxel_colors_txt);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindBuffer(GL_TEXTURE_BUFFER, voxel_colors_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(unsigned int) * grid_size, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, voxel_colors_buf);
+	/**/
 
 	// send triangles reference table for marching cubes as a texture
 	// Note: this table is too big to include in the shader as a constant
-	glGenBuffers(1, &buf2);
-	glGenTextures(1, &txtr2);
+	glGenBuffers(1, &tri_table_buf);
+	glGenTextures(1, &tri_table_txt);
 
-	glActiveTexture(GL_TEXTURE1);
-	glBindBuffer(GL_TEXTURE_BUFFER, buf2);
+	glActiveTexture(GL_TEXTURE2);
+	glBindBuffer(GL_TEXTURE_BUFFER, tri_table_buf);
 	glBufferData(GL_TEXTURE_BUFFER, 256 * 16 * sizeof(int), triTable, GL_STATIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, txtr2);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buf2);
+	glBindTexture(GL_TEXTURE_BUFFER, tri_table_txt);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, tri_table_buf);
 
 
 	// bounding box vertices
@@ -271,7 +218,7 @@ void MarchingCubes::setup()
 
 	glBindVertexArray(0);
 
-	
+
 	// query to be used to count the number of generated primitives (triangles)
 	//glGenQueries(1, &query);
 }

@@ -39,6 +39,9 @@ uniform int points_height;
 
 // marching cubes info 
 uniform mat4 mcubes_model_inv;
+uniform int mcubes_width;
+uniform int mcubes_height;
+uniform int mcubes_depth;
 
 layout (local_size_x = 1, local_size_y = 1) in;
 void main()
@@ -58,12 +61,13 @@ void main()
     
     vec4 pos = model * vec4(depth * mix(mix(f00, f10, tpos.x), mix(f01, f11, tpos.x), tpos.y), 1);
     // TODO: consider moving 0.5 offset somewhere more sensible 
-    vec4 mcubes_pos = mcubes_model_inv * pos + vec4(0.5, 0.5, 0.5, 0);
+    vec4 mcubes_pos = (mcubes_model_inv * pos + vec4(0.5, 0.5, 0.5, 0)) * vec4(mcubes_width, mcubes_height, mcubes_depth, 1);
 
     // TODO: encode this into img_output too 
     vec4 color = texture(colorTex, vec2(cpos.x, 1 - cpos.y));
     // color = mcubes_pos;
 
     // begin voxelization by writing data to texture (download to cpu)    
-    imageStore(img_output, ivec2(ipos.x, points_height - ipos.y), mcubes_pos);//color);
+    imageStore(img_output, ivec2(2 * ipos.x, points_height - ipos.y), mcubes_pos);
+    imageStore(img_output, ivec2(2 * ipos.x + 1, points_height - ipos.y), color);
 }
