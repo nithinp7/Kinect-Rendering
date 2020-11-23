@@ -22,26 +22,48 @@ class Kinect {
 	 
 public:
 
-	bool init_error_flag = false;
+	// public render flags
+	bool render_point_cloud = true;
+	bool render_mesh = false;
+	bool render_frustum = true;
+	bool render_voxels_box = true;
+	bool render_depth_txt = false;
+	bool render_color_txt = false;
+
+	// voxels box alignment to point cloud
+	float voxels_box_scale;
+	glm::vec3 voxels_box_translation;
 
 	Kinect();
 	~Kinect();
+	bool get_init_error();
 	void update();
 	void draw();
-	void debugDump();
+	void createMesh();
+	void viewPointCloud();
+	void viewMesh();
 
 private:
+
+	// read only initialization error flag
+	bool init_error_flag = false;
+
+	// render paramaters 
+	glm::mat4 model;
+	const float render_scale = 10.0f;
 
 	// global shader manager
 	ShaderResources* shaders;
 
-	// custom compute shader, creates point cloud and transforms
+	// custom compute shader, creates point cloud and transforms it into voxel space
 	GLuint kinectVoxelizeShader;
 
 	// marching cubes and voxelization related
 	MarchingCubes* mcubes;
 	glm::mat4 mcubes_model;
 	glm::mat4 mcubes_model_inv;
+	const int voxels_resolution = 200;
+
 	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
 	int* cell_buckets_heads;
 	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
@@ -114,8 +136,8 @@ private:
 	GLuint point_cloud_out_tex;
 	int points_width = -1;
 	int points_height = -1;
-	const int x_points_per_pix = 2;
-	const int y_points_per_pix = 2;
+	const int x_points_per_pix = 5;
+	const int y_points_per_pix = 5;
 	unsigned int pointCloudVAO;
 	unsigned int pointCloudVBO;
 

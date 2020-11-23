@@ -1,23 +1,23 @@
 #version 430 core
 
 // output to texture to begin voxelizing point cloud 
-layout(binding = 0, rgba32f) uniform image2D img_output;
+layout(binding = 2, rgba32f) uniform image2D img_output;
 
 // depth camera texture 
-uniform sampler2D depthTex;
+layout(binding = 0) uniform sampler2D depthTex;
 
 // fovs for depth camera 
 uniform float tan_half_depth_hfov;
 uniform float tan_half_depth_vfov;
 
 // color camera texture 
-uniform sampler2D colorTex;
+layout(binding = 1) uniform sampler2D colorTex;
 
 // fovs for color camera 
 uniform float tan_half_color_hfov;
 uniform float tan_half_color_vfov;
 
-// TODO: decide on offset and fix it with hardcode 
+// TODO: find schematics with exact offset and fix as constants
 // proportional offset to account for spacing between cameras
 uniform float offsX = 0.014;
 uniform float offsY = -0.004;
@@ -63,7 +63,6 @@ void main()
     // TODO: consider moving 0.5 offset somewhere more sensible 
     vec4 mcubes_pos = (mcubes_model_inv * pos + vec4(0.5, 0.5, 0.5, 0)) * vec4(mcubes_width, mcubes_height, mcubes_depth, 1);
 
-    // TODO: encode this into img_output too 
     vec4 color = texture(colorTex, vec2(cpos.x, 1 - cpos.y));
     // color = mcubes_pos;
 

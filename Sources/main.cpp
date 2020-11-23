@@ -8,7 +8,6 @@ std::string preamble =
 int main()
 {
 	// glfw: initialize and configure
-	// ------------------------------
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -22,7 +21,6 @@ int main()
 	std:printf(preamble.c_str());
 
 	// glfw window creation
-	// --------------------
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Kinect SLAM", NULL, NULL);
 	if (window == NULL)
 	{
@@ -39,7 +37,6 @@ int main()
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	// glad: load all OpenGL function pointers
-	// ---------------------------------------
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
 		std::cout << "Failed to initialize GLAD" << std::endl;
@@ -47,7 +44,6 @@ int main()
 	}
 
 	// configure global opengl state
-	// -----------------------------
 	glEnable(GL_MULTISAMPLE); // Enabled by default on some drivers, but not all so always enable to make sure
 	glEnable(GL_DEPTH_TEST);
 
@@ -66,19 +62,17 @@ int main()
 		glm::vec3(0.0f,  0.0f, -3.0f)
 	};
 
-	Kinect* kinect = new Kinect();
-	if (kinect->init_error_flag)
+	kinect = new Kinect();
+	if (kinect->get_init_error())
 	{
 		printf("Failed to initialize Kinect!\n");
 		exit(-1);
 	}
 
 	// render loop
-	// -----------
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
-		// --------------------
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
@@ -86,11 +80,9 @@ int main()
 		framerate = (0.4f / (deltaTime)+1.6f * framerate) / 2.0f;
 
 		// input
-		// -----
 		processInput(window);
 
 		// render
-		// ------
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -104,11 +96,6 @@ int main()
 		if(!freezeKinect) kinect->update();
 		kinect->draw();
 
-		/*
-		if (drawNormals) 
-			//blahblah Draw(normalShader);
-		*/
-
 		// draw skybox as last
 		skybox->draw();
 
@@ -117,12 +104,6 @@ int main()
 		{
 			print_screen();
 			print = false;
-		}
-
-		if (debugPrint)
-		{
-			kinect->debugDump();
-			debugPrint = false;
 		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -142,6 +123,7 @@ int main()
 	return 0;
 }
 
+// TODO: decentralize input processing 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
@@ -160,38 +142,42 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 
-	// TODO: get rid of this
-	static float offsX = 0.014f, offsY = -0.004f;
+	// Move Voxel Box 
+	if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
+		kinect->voxels_box_translation.z -= 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
+		kinect->voxels_box_translation.z += 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
+		kinect->voxels_box_translation.x -= 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+		kinect->voxels_box_translation.x += 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
+		kinect->voxels_box_translation.y += 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
+		kinect->voxels_box_translation.y -= 0.01f;
+
+	// Change size of voxel box
+	if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
+		kinect->voxels_box_scale += 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+		kinect->voxels_box_scale -= 0.01f;
 
 	// debounced button presses
 	float currentFrame = glfwGetTime();
-	bool somethingPressed = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+	bool somethingPressed = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
 	if (somethingPressed && last_pressed < currentFrame - 0.5f || last_pressed == 0.0f)
 	{
-		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS) {
-			//threshold = 1;
-			//updateGeom = true;
-			offsY -= 0.001;
-			printf("offsY set to %f meters\n", offsY);
-		}
-		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			//threshold += 20;//threshold = 90;
-			//updateGeom = true;
-			offsX += 0.001;
-			printf("offsX set to %f meters\n", offsX);
-		}
-		if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
-			//threshold = 400;
-			//updateGeom = true;
-			debugPrint = true;
-		}
 		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
-			freezeKinect = !freezeKinect;
+			kinect->createMesh();
+		}
+		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+			kinect->viewMesh();
+		}
+		if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+			kinect->viewPointCloud();
 		}
 		// Print screenshot
 		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
@@ -202,11 +188,6 @@ void processInput(GLFWwindow *window)
 		last_pressed = currentFrame;
 	}
 
-	// TODO: remove this (FOR DEBUG ONLY)
-	shaders->kinectPointCloud->use();
-	shaders->kinectPointCloud->setFloat("offsX", offsX);
-	shaders->kinectPointCloud->setFloat("offsY", offsY);
-	
 	// modifiers if needed
 	// bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT);
 	// bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL);
@@ -304,9 +285,9 @@ void set_lighting(Shader* shader, glm::vec3* pointLightPositions)
 	shader->setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
 	shader->setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
 	shader->setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-	shader->setFloat("spotLight.constant", 1.0f);
-	shader->setFloat("spotLight.linear", 0.01f);
-	shader->setFloat("spotLight.quadratic", 0.009f);
+	shader->setFloat("spotLight.constant", 0.5f);
+	shader->setFloat("spotLight.linear", 0.001f);
+	shader->setFloat("spotLight.quadratic", 0.0009f);
 	shader->setFloat("spotLight.cutOff", glm::cos(glm::radians(17.5f)));
 	shader->setFloat("spotLight.outerCutOff", glm::cos(glm::radians(22.0f)));
 

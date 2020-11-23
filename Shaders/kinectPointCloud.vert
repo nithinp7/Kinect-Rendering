@@ -10,20 +10,20 @@ layout(location = 0) in ivec2 ipos;
 out vec4 color;
 
 // depth camera texture 
-uniform sampler2D depthTex;
+layout(binding = 0) uniform sampler2D depthTex;
 
 // fovs for depth camera 
 uniform float tan_half_depth_hfov;
 uniform float tan_half_depth_vfov;
 
 // color camera texture 
-uniform sampler2D colorTex;
+layout(binding = 1) uniform sampler2D colorTex;
 
 // fovs for color camera 
 uniform float tan_half_color_hfov;
 uniform float tan_half_color_vfov;
 
-// TODO: decide on offset and fix it with hardcode 
+// TODO: find schematics with exact offset and fix as constants
 // proportional offset to account for spacing between cameras
 uniform float offsX = 0.014;
 uniform float offsY = -0.004;

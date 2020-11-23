@@ -112,7 +112,7 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 	//printf("primitives count: %d\n", primitives);
 }
 
-void MarchingCubes::draw(glm::mat4 model)
+void MarchingCubes::draw_mesh(glm::mat4 model)
 {
 	shaders->renderPass->use();
 	shaders->renderPass->setInt("material.diffuse", 0);
@@ -125,6 +125,11 @@ void MarchingCubes::draw(glm::mat4 model)
 	glBindVertexArray(TVAO);
 	glDrawTransformFeedback(GL_TRIANGLES, TFO);
 	
+	glBindVertexArray(0);
+}
+
+void MarchingCubes::draw_box(glm::mat4 model)
+{
 	// visualize bounding box of voxel field
 	shaders->line->use();
 	shaders->line->setVec4("lineColor", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));

@@ -49,14 +49,10 @@ Kinect::Kinect()
 	depth_frustum.hfov = hfov_deg / 180.0f * PI;
 
 	shaders = ShaderResources::get_instance();
-	mcubes = new MarchingCubes(200, 200, 200);
+	mcubes = new MarchingCubes(voxels_resolution, voxels_resolution, voxels_resolution);
 
-	float sc = (far_plane - near_plane) * 0.5f;
-	mcubes_model = glm::mat4();
-	mcubes_model = glm::translate(mcubes_model, glm::vec3(0.0f, 0.0f, -0.5f * (near_plane + far_plane)));
-	mcubes_model = glm::scale(mcubes_model, glm::vec3(sc, sc, sc));
-
-	mcubes_model_inv = glm::inverse(mcubes_model);
+	voxels_box_scale = (far_plane - near_plane) * 0.25f;
+	voxels_box_translation = glm::vec3(0.0f, 0.0f, -0.5f * (1.75f * near_plane + 0.25f * far_plane));
 
 	createFrustum(&color_frustum, glm::vec4(1, 0, 0, 1));
 	createFrustum(&depth_frustum, glm::vec4(1, 1, 0, 1));
@@ -71,7 +67,6 @@ Kinect::Kinect()
 
 	// color camera texture CPU -> GPU
 	glGenTextures(1, &kinect_color_texture);
-	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -82,7 +77,6 @@ Kinect::Kinect()
 
 	// depth camera texture CPU -> GPU
 	glGenTextures(1, &kinect_depth_texture);
-	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -91,9 +85,9 @@ Kinect::Kinect()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, depth_width, depth_height, 0, GL_RED, GL_UNSIGNED_SHORT, (GLvoid*)kinect_depth_data);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	//TODO: change to texture buffer ? compare gl_texture_2d with gl_texture_buffer 
 	// point cloud output data GPU -> CPU 
 	glGenTextures(1, &point_cloud_out_tex);
-	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
 	// TODO: check if all these parameters are needed 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -101,31 +95,20 @@ Kinect::Kinect()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2 * points_width, points_height, 0, GL_RGBA, GL_FLOAT, NULL);
-	glBindImageTexture(0, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	shaders->kinectDepthTexture->use();
-	shaders->kinectDepthTexture->setInt("tex", 1);
 	shaders->kinectDepthTexture->setFloat("far_plane", far_plane);
 
 	shaders->kinectPointCloud->use();
-	shaders->kinectPointCloud->setInt("colorTex", 0);
-	shaders->kinectPointCloud->setInt("depthTex", 1);
 	shaders->kinectPointCloud->setFloat("far_plane", far_plane);
 		
 	// TODO: move to different spot?
-	shaders->kinectPointCloud->setMat4("mcubes_model_inv", mcubes_model_inv);
-
 	shaders->kinectVoxelize->use();
-	shaders->kinectVoxelize->setInt("colorTex", 0);
-	shaders->kinectVoxelize->setInt("depthTex", 1);
 	shaders->kinectVoxelize->setFloat("far_plane", far_plane);
 
-	// TODO: move to different spot?
-	shaders->kinectVoxelize->setMat4("mcubes_model_inv", mcubes_model_inv);
 	shaders->kinectVoxelize->setInt("mcubes_width", mcubes->width);
 	shaders->kinectVoxelize->setInt("mcubes_height", mcubes->height);
 	shaders->kinectVoxelize->setInt("mcubes_depth", mcubes->depth);
-	//shaders->kinectVoxelize->setInt("img_output", 2);
 
 	shaders->texture->use();
 	shaders->texture->setInt("tex", 2);
@@ -150,58 +133,72 @@ Kinect::~Kinect()
 	glDeleteBuffers(1, &depth_frustum.camVBO);
 }
 	
+bool Kinect::get_init_error()
+{
+	return init_error_flag;
+}
+
 void Kinect::update()
 {
 	fetchData();
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, color_width, color_height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
-
-	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, depth_width, depth_height, GL_RED, GL_UNSIGNED_SHORT, (GLvoid*)kinect_depth_data);
+
+	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, color_width, color_height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
 }
 
 void Kinect::draw()
 {
-	glm::mat4 model;
-	//model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+	model = glm::mat4();
+	model = glm::scale(model, glm::vec3(render_scale));
+
+	mcubes_model = glm::mat4();
+	mcubes_model = glm::scale(mcubes_model, glm::vec3(render_scale));
+	mcubes_model = glm::translate(mcubes_model, voxels_box_translation);
+	mcubes_model = glm::scale(mcubes_model, glm::vec3(voxels_box_scale));
+
+	mcubes_model_inv = glm::inverse(mcubes_model);
 
 	shaders->line->use();
 	shaders->line->setMat4("model", model);
 
-	//shaders->line->setVec4("lineColor", color_frustum.color);
-	//glBindVertexArray(color_frustum.VAO);
-	//glDrawArrays(GL_LINES, 0, 24);
+	if (render_frustum) {
+		shaders->line->setVec4("lineColor", depth_frustum.color);
+		glBindVertexArray(depth_frustum.VAO);
+		glDrawArrays(GL_LINES, 0, 24);
+	}
 
-	shaders->line->setVec4("lineColor", depth_frustum.color);
-	glBindVertexArray(depth_frustum.VAO);
-	glDrawArrays(GL_LINES, 0, 24);
+	if (render_depth_txt) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+		shaders->kinectDepthTexture->use();
+		shaders->kinectDepthTexture->setMat4("model", model);
+		glBindVertexArray(depth_frustum.camVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
 
-	/*
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
-	shaders->kinectDepthTexture->use();
-	shaders->kinectDepthTexture->setMat4("model", model);
-	glBindVertexArray(depth_frustum.camVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	*/
-
-	//shaders->texture->use();
-	//shaders->texture->setMat4("model", model);
-	//glBindVertexArray(depth_frustum.camVAO);
-	//glDrawArrays(GL_TRIANGLES, 0, 6);
-	
-	shaders->kinectPointCloud->use();
-	shaders->kinectPointCloud->setMat4("model", model);
-	glPointSize(4.0f);
-	glBindVertexArray(pointCloudVAO);
-	//glDrawArrays(GL_POINTS, 0, points_width * points_height);
+	if (render_point_cloud) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+		shaders->kinectPointCloud->use();
+		shaders->kinectPointCloud->setMat4("model", model);
+		shaders->kinectPointCloud->setMat4("mcubes_model_inv", mcubes_model_inv);
+		glPointSize(4.0f);
+		glBindVertexArray(pointCloudVAO);
+		glDrawArrays(GL_POINTS, 0, points_width * points_height);
+	}
 
 	glBindVertexArray(0);
 
-	mcubes->draw(mcubes_model);
+	if(render_mesh) 
+		mcubes->draw_mesh(mcubes_model);
+
+	if (render_voxels_box)
+		mcubes->draw_box(mcubes_model);
 }
 
 void Kinect::createFrustum(Kinect::frustum* f, glm::vec4 color)
@@ -334,29 +331,26 @@ void Kinect::fetchData()
 	if (depth_frame) depth_frame->Release();
 }
 
-void Kinect::debugDump() 
+void Kinect::createMesh() 
 {
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+	viewMesh();
 
-	glm::mat4 model;
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
+	glBindImageTexture(2, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	shaders->kinectVoxelize->use();
 	shaders->kinectVoxelize->setMat4("model", model);
-
-	//glActiveTexture(GL_TEXTURE2);
-	//glBindImageTexture(0, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	shaders->kinectVoxelize->setMat4("mcubes_model_inv", mcubes_model_inv);
 
 	glDispatchCompute((GLuint)points_width, (GLuint)points_height, (GLuint)1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	//shaders->texture->use();
-	//shaders->texture->setInt("tex", 2);
-
-	glActiveTexture(GL_TEXTURE2);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, point_cloud_out_buf);
 
 	// fill voxel buckets, each bucket is a linked list representing the points from the point cloud that landed in that cell
@@ -423,33 +417,13 @@ void Kinect::debugDump()
 							if (check_cell_in_bounds(x + kx, y + ky, z + kz))
 								density_contribution_from_cell(x, y, z, x + kx, y + ky, z + kz, &density, &color);
 
-				/*
-				if (check_cell_in_bounds(x, y, z))
-					density_contribution_from_cell(x, y, z, x, y, z, &density, &color);
-				if (check_cell_in_bounds(x - 1, y, z))
-					density_contribution_from_cell(x, y, z, x - 1, y, z, &density, &color);
-				if (check_cell_in_bounds(x - 1, y - 1, z))
-					density_contribution_from_cell(x, y, z, x - 1, y - 1, z, &density, &color);
-				if (check_cell_in_bounds(x, y - 1, z))
-					density_contribution_from_cell(x, y, z, x, y - 1, z, &density, &color);
-
-				if (check_cell_in_bounds(x, y, z - 1))
-					density_contribution_from_cell(x, y, z, x, y, z - 1, &density, &color);
-				if (check_cell_in_bounds(x - 1, y, z - 1))
-					density_contribution_from_cell(x, y, z, x - 1, y, z - 1, &density, &color);
-				if (check_cell_in_bounds(x - 1, y - 1, z - 1))
-					density_contribution_from_cell(x, y, z, x - 1, y - 1, z - 1, &density, &color);
-				if (check_cell_in_bounds(x, y - 1, z - 1))
-					density_contribution_from_cell(x, y, z, x, y - 1, z - 1, &density, &color);
-					*/
-
 				// TODO: find better color than black to assign if alpha < EPSILON (maybe set density to zero?)
 				// TODO: normalize in shader, so color can be stochastically accumulated with additional point cloud data 
 				
 				if (color.a > EPSILON)
 					color = color / color.a;
 				color *= 255.0f;
-				//color = glm::vec4(255.0f, 100.0f, 50.0f, 255.0f);
+				//color = glm::vec4(155.0f, 20.0f, 150.0f, 255.0f);
 
 				unsigned int color_packed = ((unsigned int)(unsigned char)color.r) << 24 | 
 											((unsigned int)(unsigned char)color.g) << 16 | 
@@ -460,5 +434,17 @@ void Kinect::debugDump()
 				mcubes->voxel_colors[index] = color_packed;
 			}
 
-	mcubes->updateGeometry(50, true);
+	mcubes->updateGeometry(70, true);
+}
+
+void Kinect::viewPointCloud()
+{
+	render_mesh = false;
+	render_point_cloud = true;
+}
+
+void Kinect::viewMesh()
+{
+	render_mesh = true;
+	render_point_cloud = false;
 }

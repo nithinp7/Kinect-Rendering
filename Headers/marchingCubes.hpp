@@ -325,7 +325,8 @@ public:
 	~MarchingCubes();
 	void set_voxel(int x, int y, int z, short val);
 	void updateGeometry(int threshold, bool reupload_voxels);
-	void draw(glm::mat4 model);
+	void draw_mesh(glm::mat4 model);
+	void draw_box(glm::mat4 model);
 
 private:
 
