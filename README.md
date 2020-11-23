@@ -16,26 +16,15 @@ The Kinect Fusion library has already implemented comprehensive photogrammetry a
 
 ## Progress:
 
-### Update 1:
+### Update 4:
 
-So far, the program aligns the color and depth cameras, creates a point cloud from the fused data, and renders a point cloud in realtime.
+Made the red voxels bounding box into a selection interface to determine what subset of the point cloud data to construct into a mesh. Added some render flags to control from input what type of data is being rendered (raw camera, point cloud, geometry, etc.). Here, my acoustic guitar is selected with the red box and only the points within the bounding box are used to construct a mesh. Note this is useful because the entire resolution of the voxel field goes directly towards the area of interest in the scene. 
 
-#### YouTube Link: 
-https://youtu.be/TrRJwSSkSFM
+![Image 11](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation1.png)
 
-![Image 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-001.jpg)
+![Image 12](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation2.png)
 
-![Image 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-003.jpg)
-
-![Image 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-004.jpg)
-
-![Image 4](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-006.jpg)
-
-### Update 2:
-
-Basic integration of marching cubes. So far, the program transfers density from the point cloud into a simple boolean voxel field (notice blocky geometry).
-
-![Image 5](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_18_2020%208_49_48%20PM.png)
+![Image 13](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation3.png)
 
 ### Update 3:
 
@@ -51,12 +40,25 @@ Implemented density and color smoothing function to convert from point cloud to 
 
 ![Image 10](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_20_2020%2011_08_34%20PM.png)
 
-### Update 4:
+### Update 2:
 
-Made the red voxels bounding box into a selection interface to determine what subset of the point cloud data to construct into a mesh. Added some render flags to control from input what type of data is being rendered (raw camera, point cloud, geometry, etc.). Here, my acoustic guitar is selected with the red box and only the points within the bounding box are used to construct a mesh. Note this is useful because the entire resolution of the voxel field goes directly towards the area of interest in the scene. 
+Basic integration of marching cubes. So far, the program transfers density from the point cloud into a simple boolean voxel field (notice blocky geometry).
 
-![Image 11](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation1.png)
+![Image 5](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_18_2020%208_49_48%20PM.png)
 
-![Image 12](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation2.png)
 
-![Image 13](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation3.png)
+### Update 1:
+
+So far, the program aligns the color and depth cameras, creates a point cloud from the fused data, and renders a point cloud in realtime.
+
+#### YouTube Link: 
+https://youtu.be/TrRJwSSkSFM
+
+![Image 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-001.jpg)
+
+![Image 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-003.jpg)
+
+![Image 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-004.jpg)
+
+![Image 4](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/out-006.jpg)
+
