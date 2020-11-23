@@ -50,3 +50,13 @@ Implemented density and color smoothing function to convert from point cloud to 
 ![Image 9](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_20_2020%2011_03_56%20PM.png)
 
 ![Image 10](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_20_2020%2011_08_34%20PM.png)
+
+### Update 4:
+
+Made the red voxels bounding box into a selection interface to determine what subset of the point cloud data to construct into a mesh. Added some render flags to control from input what type of data is being rendered (raw camera, point cloud, geometry, etc.). Here, my acoustic guitar is selected with the red box and only the points within the bounding box are used to construct a mesh. Note this is useful because the entire resolution of the voxel field goes directly towards the area of interest in the scene. 
+
+![Image 11](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation1.png)
+
+![Image 12](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation2.png)
+
+![Image 13](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/segmentation3.png)
