@@ -1,18 +1,19 @@
 #version 430
 
-layout(local_size_x = 1, local_size_y = 1) in;
-layout(binding = 0, rgba32f) uniform image2D img_output;
+layout(binding = 0, r16i) uniform iimageBuffer voxels;
+layout(binding = 1, r32ui) uniform uimageBuffer voxels_col;
 
+uniform int WIDTH;
+uniform int HEIGHT;
+uniform int DEPTH;
+
+layout(local_size_x = 1, local_size_y = 1) in;
 void main() {
-  // base pixel colour for image
-  vec4 color = vec4(0, 1, 0, 1);
-  // get index in global work group i.e x,y position
-  ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-  
-  //
-  // interesting stuff happens here later
-  //
-  
-  // output to a specific pixel in the image
-  imageStore(img_output, pixel_coords, color);
+  ivec3 vcoords = ivec3(gl_GlobalInvocationID.xyz);
+  int index = vcoords.z * WIDTH * HEIGHT + vcoords.y * WIDTH + vcoords.x;
+  int density = (vcoords.x < WIDTH / 2 && vcoords.y < HEIGHT / 2 && vcoords.z < DEPTH / 2) ? 50 : 0; 
+  unsigned int color = 0xff00f0ff;
+
+  imageStore(voxels, index, ivec4(density, 0, 0, 0));
+  imageStore(voxels_col, index, ivec4(color, 0, 0, 0));
 }

@@ -36,7 +36,7 @@ MarchingCubes::MarchingCubes(int w, int h, int d)
 	shaders->marchingCubes->setInt("DEPTH", depth);
 
 	// initial geometry pass
-	updateGeometry(100, true);
+	updateGeometry(25, true);
 }
 
 MarchingCubes::~MarchingCubes()
@@ -75,20 +75,15 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 	shaders->marchingCubes->use();
 	shaders->marchingCubes->setInt("threshold", threshold);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_BUFFER, voxels_txt);
-	
 	if (reupload_voxels)
 	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_BUFFER, voxels_txt);
 		glBindBuffer(GL_TEXTURE_BUFFER, voxels_buf);
 		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(short) * grid_size, voxels);
-	}
-	
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
 
-	if (reupload_voxels)
-	{
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
 		glBindBuffer(GL_TEXTURE_BUFFER, voxel_colors_buf);
 		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(unsigned int) * grid_size, voxel_colors);
 	}
@@ -107,6 +102,7 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 
 	//glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
 	glDisable(GL_RASTERIZER_DISCARD);
+	glFlush();
 	glFinish();
 	//glGetQueryObjectuiv(query, GL_QUERY_RESULT, &primitives);
 	//printf("primitives count: %d\n", primitives);
@@ -141,6 +137,12 @@ void MarchingCubes::draw_box(glm::mat4 model)
 	glBindVertexArray(0);
 }
 
+void MarchingCubes::bind_voxels_tex_targets()
+{
+	glBindImageTexture(0, voxels_txt, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R16I);
+	glBindImageTexture(1, voxel_colors_txt, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32UI);
+}
+
 void MarchingCubes::setup()
 {
 	// cells vertex array for the marching cubes geometry shader (executes per each cell)
@@ -166,7 +168,7 @@ void MarchingCubes::setup()
 	//glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, buf);
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_R16I, voxels_buf);
 
-	/* */
+	
 	// send voxel color data as a texture
 	glGenBuffers(1, &voxel_colors_buf);
 	glGenTextures(1, &voxel_colors_txt);
@@ -176,7 +178,7 @@ void MarchingCubes::setup()
 	glBufferData(GL_TEXTURE_BUFFER, sizeof(unsigned int) * grid_size, nullptr, GL_DYNAMIC_DRAW);
 	glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, voxel_colors_buf);
-	/**/
+	
 
 	// send triangles reference table for marching cubes as a texture
 	// Note: this table is too big to include in the shader as a constant
@@ -203,7 +205,6 @@ void MarchingCubes::setup()
 
 
 	// transform feedback of triangle vertices from the geometry construction pass
-	// used to render during the render pass 
 	glGenVertexArrays(1, &TVAO);
 	glGenTransformFeedbacks(1, &TFO);
 	glGenBuffers(1, &TBO);

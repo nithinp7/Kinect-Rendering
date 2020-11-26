@@ -1,0 +1,21 @@
+#version 430
+
+// input and output 
+layout(binding = 0, r32i) uniform iimageBuffer buf;
+
+// kernel size 
+uniform int KERNEL_SIZE;
+// buffer length 
+uniform int BUFFER_LEN;
+// stride to use (KERNEL_SIZE ^ i where i is the current reduction step) 
+uniform int STRIDE;
+
+layout(local_size_x = 1, local_size_y = 1) in;
+void main() {
+	int index = STRIDE * int(gl_GlobalInvocationID.x);
+	int end = min(index + STRIDE * KERNEL_SIZE, BUFFER_LEN);
+	int sum = 0;
+	for (int i = index; i < end; i += STRIDE) 
+		sum += imageLoad(buf, index).r; 
+	imageStore(buf, index, ivec4(sum, 0, 0, 0));
+}

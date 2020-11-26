@@ -13,6 +13,8 @@
 
 #include <marchingCubes.hpp>
 
+#include <screenQuad.hpp>
+
 #include <math.h>
 
 #define PI 3.14159265358979323846  /* pi */
@@ -29,6 +31,8 @@ public:
 	bool render_voxels_box = true;
 	bool render_depth_txt = false;
 	bool render_color_txt = false;
+	bool render_screen_depth = false;
+	bool render_screen_color = false;
 
 	// voxels box alignment to point cloud
 	float voxels_box_scale;
@@ -39,7 +43,9 @@ public:
 	bool get_init_error();
 	void update();
 	void draw();
-	void createMesh();
+	//dbg
+	void createMeshGPU();
+	void createMeshCPU();
 	void viewPointCloud();
 	void viewMesh();
 
@@ -66,8 +72,12 @@ private:
 
 	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
 	int* cell_buckets_heads;
+	GLuint cell_buckets_heads_tex;
+	GLuint cell_buckets_heads_buf;
 	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
 	int* cell_buckets_nodes;
+	GLuint cell_buckets_nodes_tex;
+	GLuint cell_buckets_nodes_buf;
 
 	// camera textures
 	struct camera_tex_vertex {
@@ -132,7 +142,8 @@ private:
 
 	// point cloud
 	glm::ivec2* point_cloud_verts;
-	glm::vec4* point_cloud_out_buf;
+	glm::vec4* point_cloud_out_data;
+	GLuint point_cloud_out_buf;
 	GLuint point_cloud_out_tex;
 	int points_width = -1;
 	int points_height = -1;

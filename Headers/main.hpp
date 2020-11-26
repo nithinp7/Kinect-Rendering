@@ -20,7 +20,7 @@
 #include <shaderResources.hpp>
 #include <resourcesLoader.hpp>
 
-//#include <screenQuad.hpp>
+#include <screenQuad.hpp>
 #include <skybox.hpp>
 
 #include <camera.hpp>

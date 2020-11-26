@@ -157,7 +157,7 @@ void main()
 			vec3 vertPos = offs + pos + -d0 * (v1 - v0) / (d1 - d0) + v0;
 			Color = -d0 * (col1 - col0) / (d1 - d0) + col0;
 			Color = vec4(Color.rgb / 255.0, 1);
-
+			
 			vec3 g0 = get_gradient(gridPos[0].x + c0.x, gridPos[0].y + c0.y, gridPos[0].z + c0.z);
 			vec3 g1 = get_gradient(gridPos[0].x + c1.x, gridPos[0].y + c1.y, gridPos[0].z + c1.z);
 

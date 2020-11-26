@@ -9,6 +9,7 @@ class ShaderResources {
 
 public:
 	Shader* screen;
+	Shader* screenDepth;
 	Shader* point;
 	Shader* line;
 	Shader* normal;
@@ -19,6 +20,8 @@ public:
 	Shader* kinectPointCloud;
 	Shader* kinectDepthTexture;
 	Shader* kinectVoxelize;
+	Shader* points2voxels;
+	Shader* bufferSum;
 	Shader* test;
 
 	static ShaderResources* get_instance();

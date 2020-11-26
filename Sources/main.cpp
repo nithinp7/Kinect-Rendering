@@ -54,6 +54,8 @@ int main()
 
 	Skybox* skybox = new Skybox();
 
+	ScreenQuad::init();
+
 	// positions of the point lights
 	glm::vec3 pointLightPositions[] = {
 		glm::vec3(0.7f,  0.2f,  2.0f),
@@ -115,6 +117,7 @@ int main()
 	// release resources  
 	delete kinect;
 	delete skybox;
+	ScreenQuad::destroy();
 
 	ShaderResources::reset_instance();
 	shaders = NULL;
@@ -165,13 +168,17 @@ void processInput(GLFWwindow *window)
 	// debounced button presses
 	float currentFrame = glfwGetTime();
 	bool somethingPressed = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
 	if (somethingPressed && last_pressed < currentFrame - 0.5f || last_pressed == 0.0f)
 	{
 		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
-			kinect->createMesh();
+			kinect->createMeshGPU();
+		}
+		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+			kinect->createMeshCPU();
 		}
 		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
 			kinect->viewMesh();

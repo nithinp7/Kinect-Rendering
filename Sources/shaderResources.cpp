@@ -20,6 +20,7 @@ ShaderResources::ShaderResources()
 {
 	// regular shader programs (vertex -> frag)
 	screen = new Shader("../KinectSLAM/Shaders/screenShader.vert", "../KinectSLAM/Shaders/screenShader.frag");
+	screenDepth = new Shader("../KinectSLAM/Shaders/kinectDepthScreen.vert", "../KinectSLAM/Shaders/kinectDepthScreen.frag");
 	point = new Shader("../KinectSLAM/Shaders/point.vert", "../KinectSLAM/Shaders/point.frag");
 	line= new Shader("../KinectSLAM/Shaders/line.vert", "../KinectSLAM/Shaders/line.frag");
 	texture = new Shader("../KinectSLAM/Shaders/texture.vert", "../KinectSLAM/Shaders/texture.frag");
@@ -36,12 +37,15 @@ ShaderResources::ShaderResources()
 
 	// compute shaders 
 	kinectVoxelize = new Shader("../KinectSLAM/Shaders/kinectVoxelize.comp");
+	points2voxels = new Shader("../KinectSLAM/Shaders/points2voxels.comp");
+	bufferSum = new Shader("../KinectSLAM/Shaders/bufferSum.comp");
 	test = new Shader("../KinectSLAM/Shaders/test.comp");
 }
 
 ShaderResources::~ShaderResources()
 {
 	delete screen;
+	delete screenDepth;
 	delete point;
 	delete line;
 	delete texture;
@@ -52,6 +56,8 @@ ShaderResources::~ShaderResources()
 	delete kinectPointCloud;
 	delete kinectDepthTexture;
 	delete kinectVoxelize;
+	delete points2voxels;
+	delete bufferSum;
 	delete test;
 }
 

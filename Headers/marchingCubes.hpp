@@ -327,17 +327,18 @@ public:
 	void updateGeometry(int threshold, bool reupload_voxels);
 	void draw_mesh(glm::mat4 model);
 	void draw_box(glm::mat4 model);
+	void bind_voxels_tex_targets();
 
 private:
 
-	unsigned int TVAO, VAO, boxVAO, TFO, TBO, VBO, boxVBO;
-	unsigned int voxels_buf, voxel_colors_buf, tri_table_buf;
-	unsigned int voxels_txt, voxel_colors_txt, tri_table_txt;
+	GLuint TVAO, VAO, boxVAO, TFO, TBO, VBO, boxVBO;
+	GLuint voxels_buf, voxel_colors_buf, tri_table_buf;
+	GLuint voxels_txt, voxel_colors_txt, tri_table_txt;
 
 	ShaderResources* shaders;
 
 	GLuint primitives;
-	unsigned int query;
+	GLuint query;
 
 	void setup();
 };
