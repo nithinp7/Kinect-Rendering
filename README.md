@@ -16,6 +16,21 @@ The Kinect Fusion library has already implemented comprehensive photogrammetry a
 
 ## Progress:
 
+### Update 5:
+
+Marching cubes can now operate on voxel grids as big as 500x500x500 if not bigger. Implemented dynamically sized transform feedback buffer for marching cubes by splitting it into 2 passes (the first to count how much space needs to be allocated, the second to generate the triangles). In doing so, I implemented a parallel array sum in a compute shader which could easily be generalized to a parallel reduce implementation. Note also that I had to set TDR delay to 10 seconds instead of 2 seconds to allow for the long execution time of compute shaders operating on large voxel grid sizes; likely even larger sizes can be used with a higher TDR delay or by splitting compute shader invocations into chunks.
+
+#### YouTube Link:
+https://youtu.be/stGctuA-qC4
+
+Note the gap artifacts in the second and third picture when the voxel resolution is much smaller than the kinect point cloud spacing. Smoothing gets immediately too expensive if the radius is increased, so I am instead hoping to fix this by aligning multiple frames of point cloud data and stochastically building more complete density fields even on a high resolution voxel field.
+
+![Voxel Resolution 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%206_59_45%20PM.png)
+
+![Voxel Resolution 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_15%20PM.png)
+
+![Voxel Resolution 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_36%20PM.png)
+
 ### Update 4:
 
 Made the red voxels bounding box into a selection interface to determine what subset of the point cloud data to construct into a mesh. Added some render flags to control from input what type of data is being rendered (raw camera, point cloud, geometry, etc.). Here, my acoustic guitar is selected with the red box and only the points within the bounding box are used to construct a mesh. Note this is useful because the entire resolution of the voxel field goes directly towards the area of interest in the scene. 
