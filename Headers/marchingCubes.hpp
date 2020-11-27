@@ -332,8 +332,8 @@ public:
 private:
 
 	GLuint TVAO, VAO, boxVAO, TFO, TBO, VBO, boxVBO;
-	GLuint voxels_buf, voxel_colors_buf, tri_table_buf;
-	GLuint voxels_txt, voxel_colors_txt, tri_table_txt;
+	GLuint voxels_buf, voxel_colors_buf, tri_table_buf, verts_count_buf;
+	GLuint voxels_txt, voxel_colors_txt, tri_table_txt, verts_count_txt;
 
 	ShaderResources* shaders;
 

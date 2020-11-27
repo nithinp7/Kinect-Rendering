@@ -12,10 +12,10 @@ uniform int STRIDE;
 
 layout(local_size_x = 1, local_size_y = 1) in;
 void main() {
-	int index = STRIDE * int(gl_GlobalInvocationID.x);
+	int index = STRIDE * KERNEL_SIZE * int(gl_GlobalInvocationID.x);
 	int end = min(index + STRIDE * KERNEL_SIZE, BUFFER_LEN);
 	int sum = 0;
 	for (int i = index; i < end; i += STRIDE) 
-		sum += imageLoad(buf, index).r; 
+		sum += imageLoad(buf, i).r; 
 	imageStore(buf, index, ivec4(sum, 0, 0, 0));
 }

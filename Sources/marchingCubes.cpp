@@ -35,6 +35,14 @@ MarchingCubes::MarchingCubes(int w, int h, int d)
 	shaders->marchingCubes->setInt("HEIGHT", height);
 	shaders->marchingCubes->setInt("DEPTH", depth);
 
+
+	shaders->marchingCubesVertsCount->use();
+
+	shaders->marchingCubesVertsCount->setInt("WIDTH", width);
+	shaders->marchingCubesVertsCount->setInt("HEIGHT", height);
+	shaders->marchingCubesVertsCount->setInt("DEPTH", depth);
+
+
 	// initial geometry pass
 	updateGeometry(25, true);
 }
@@ -50,6 +58,7 @@ MarchingCubes::~MarchingCubes()
 	glDeleteTextures(1, &voxels_txt);
 	glDeleteTextures(1, &voxel_colors_txt);
 	glDeleteTextures(1, &tri_table_txt);
+	glDeleteTextures(1, &verts_count_txt);
 
 	glDeleteBuffers(1, &TBO);
 	glDeleteBuffers(1, &VBO);
@@ -57,6 +66,7 @@ MarchingCubes::~MarchingCubes()
 	glDeleteBuffers(1, &voxels_buf);
 	glDeleteBuffers(1, &voxel_colors_buf);
 	glDeleteBuffers(1, &tri_table_buf);
+	glDeleteBuffers(1, &verts_count_buf);
 
 	free(voxels);
 	free(voxel_colors);
@@ -72,9 +82,6 @@ void MarchingCubes::set_voxel(int x, int y, int z, short val)
 
 void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 {
-	shaders->marchingCubes->use();
-	shaders->marchingCubes->setInt("threshold", threshold);
-
 	if (reupload_voxels)
 	{
 		glActiveTexture(GL_TEXTURE0);
@@ -87,10 +94,54 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 		glBindBuffer(GL_TEXTURE_BUFFER, voxel_colors_buf);
 		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(unsigned int) * grid_size, voxel_colors);
 	}
-	
+
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_BUFFER, tri_table_txt);
-	
+
+	glBindImageTexture(3, verts_count_txt, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32I);
+
+	shaders->marchingCubesVertsCount->use();
+	shaders->marchingCubesVertsCount->setInt("threshold", threshold);
+
+	glDispatchCompute(width - 1, height - 1, depth - 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	glBindImageTexture(0, verts_count_txt, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
+
+	int n = num_cells;
+	int k = 10;
+	int stride = 1;
+
+	shaders->bufferSum->use();
+	shaders->bufferSum->setInt("KERNEL_SIZE", k);
+	shaders->bufferSum->setInt("BUFFER_LEN", n);
+
+	int end = ceil(log(n) / log(k));
+
+	for (int i = 0; i < end; i++) {
+		shaders->bufferSum->setInt("STRIDE", stride);
+
+		n = n / k + !!(n % k);
+
+		glDispatchCompute(n, 1, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		stride *= k;
+	}
+
+	int res = 0;
+
+	glBindBuffer(GL_TEXTURE_BUFFER, verts_count_buf);
+	glGetBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(int), &res);
+
+	//printf("RESULT: %d\n", res);
+
+	glBindBuffer(GL_ARRAY_BUFFER, TBO);
+	glBufferData(GL_ARRAY_BUFFER, res * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
+
+	shaders->marchingCubes->use();
+	shaders->marchingCubes->setInt("threshold", threshold);
+
 	glEnable(GL_RASTERIZER_DISCARD);
 	//glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query);
 	glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TFO);
@@ -156,6 +207,7 @@ void MarchingCubes::setup()
 	glEnableVertexAttribArray(0);
 	glVertexAttribIPointer(0, 1, GL_INT/*, GL_FALSE*/, sizeof(int), (void*)0);
 
+	//TODO: probably don't need glActiveTexture(...) during initialization
 
 	// send voxel data as a texture
 	glGenBuffers(1, &voxels_buf);
@@ -178,7 +230,18 @@ void MarchingCubes::setup()
 	glBufferData(GL_TEXTURE_BUFFER, sizeof(unsigned int) * grid_size, nullptr, GL_DYNAMIC_DRAW);
 	glBindTexture(GL_TEXTURE_BUFFER, voxel_colors_txt);
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, voxel_colors_buf);
-	
+
+
+	// buffer texture used to count how many verts will be generated from marching cubes
+	glGenBuffers(1, &verts_count_buf);
+	glGenTextures(1, &verts_count_txt);
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindBuffer(GL_TEXTURE_BUFFER, verts_count_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * num_cells, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, verts_count_txt);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, verts_count_buf);
+
 
 	// send triangles reference table for marching cubes as a texture
 	// Note: this table is too big to include in the shader as a constant
@@ -212,7 +275,7 @@ void MarchingCubes::setup()
 	glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TFO);
 	glBindVertexArray(TVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, TBO);
-	glBufferData(GL_ARRAY_BUFFER, num_cells * 15 * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
+	//glBufferData(GL_ARRAY_BUFFER, num_cells * 15 * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, TBO);
 
 	glEnableVertexAttribArray(0);

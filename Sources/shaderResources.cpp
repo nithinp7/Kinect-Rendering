@@ -36,6 +36,7 @@ ShaderResources::ShaderResources()
 	marchingCubes = new Shader("../KinectSLAM/Shaders/marchingCubes.vert", "../KinectSLAM/Shaders/marchingCubes.frag", "../KinectSLAM/Shaders/marchingCubes.geom", tf_list);
 
 	// compute shaders 
+	marchingCubesVertsCount = new Shader("../KinectSLAM/Shaders/marchingCubesVertsCount.comp");
 	kinectVoxelize = new Shader("../KinectSLAM/Shaders/kinectVoxelize.comp");
 	points2voxels = new Shader("../KinectSLAM/Shaders/points2voxels.comp");
 	bufferSum = new Shader("../KinectSLAM/Shaders/bufferSum.comp");
@@ -51,6 +52,7 @@ ShaderResources::~ShaderResources()
 	delete texture;
 	delete normal;
 	delete marchingCubes;
+	delete marchingCubesVertsCount;
 	delete renderPass;
 	delete skybox;
 	delete kinectPointCloud;

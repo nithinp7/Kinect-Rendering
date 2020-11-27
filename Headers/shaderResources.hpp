@@ -15,6 +15,7 @@ public:
 	Shader* normal;
 	Shader* texture;
 	Shader* marchingCubes;
+	Shader* marchingCubesVertsCount;
 	Shader* renderPass;
 	Shader* skybox;
 	Shader* kinectPointCloud;

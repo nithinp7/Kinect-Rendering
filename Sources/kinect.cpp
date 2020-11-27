@@ -434,7 +434,7 @@ void Kinect::createMeshGPU()
 	glDispatchCompute(mcubes->width, mcubes->height, mcubes->depth);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	mcubes->updateGeometry(70, false);
+	mcubes->updateGeometry(40, false);
 }
 
 void Kinect::createMeshCPU() 

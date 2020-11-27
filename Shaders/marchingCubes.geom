@@ -105,9 +105,6 @@ layout(points) in;
 layout(triangle_strip, max_vertices = 15) out;
 void main()
 {
-	Normal = vec3(0.0, 0.0, 1.0);
-	Color = vec4(1.0, 0.0, 0.0, 1.0);
-
 	vec3 pos = vec3(float(gridPos[0].x), float(gridPos[0].y), float(gridPos[0].z));
 	
 	vec3 offs = vec3(0.0, 0.0, 0.0);
@@ -123,7 +120,6 @@ void main()
 		return;
 	
 	int edge = 0;
-	bool cont = false;
 	for (int i = 0; i < 5; i++)
 	{
 		for (int p = 0; p < 3; p++)
@@ -131,10 +127,7 @@ void main()
 			int index = triTable(config, edge);
 						
 			if (index == -1)
-			{
-				cont = true;
-				break;
-			}
+				return;
 
 			int i0 = edgeToCornerTable[index][0];
 			int i1 = edgeToCornerTable[index][1];
@@ -172,8 +165,6 @@ void main()
 						
 			edge++;
 		}
-
-		if(cont) break;
 
 		EndPrimitive();
 	}

@@ -68,7 +68,7 @@ private:
 	MarchingCubes* mcubes;
 	glm::mat4 mcubes_model;
 	glm::mat4 mcubes_model_inv;
-	const int voxels_resolution = 200;
+	const int voxels_resolution = 500;
 
 	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
 	int* cell_buckets_heads;
