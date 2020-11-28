@@ -1,11 +1,12 @@
 #version 430
 
-layout(binding = 0, rgba8ui) uniform uimage2D img;
+layout(binding = 0, rgba8ui) uniform uimage2D img_in;
+layout(binding = 1, r8ui) uniform uimage2D img_out;
 
 layout(local_size_x = 1, local_size_y = 1) in;
 void main() {
   ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-  uvec4 col = uvec4(imageLoad(img, coords));
+  uvec4 col = uvec4(imageLoad(img_in, coords));
   unsigned int grey = unsigned int(0.2989 * float(col.r) + 0.5870 * float(col.b) + 0.1140 * float(col.g));
-  imageStore(img, coords, uvec4(grey, grey, grey, col.a));
+  imageStore(img_out, coords, uvec4(grey, 0, 0, 0));
 }

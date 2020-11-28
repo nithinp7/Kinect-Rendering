@@ -32,7 +32,7 @@ public:
 	bool render_depth_txt = false;
 	bool render_color_txt = false;
 	bool render_screen_depth = false;
-	bool render_screen_color = false;
+	bool render_screen_color = true;
 
 	// voxels box alignment to point cloud
 	float voxels_box_scale;
@@ -43,7 +43,6 @@ public:
 	bool get_init_error();
 	void update();
 	void draw();
-	//dbg
 	void createMeshGPU();
 	void createMeshCPU();
 	void viewPointCloud();
@@ -152,9 +151,17 @@ private:
 	unsigned int pointCloudVAO;
 	unsigned int pointCloudVBO;
 
+	// image processing
+	GLuint grey_tex;
+	GLuint edges_tex;
+
 	void createFrustum(frustum* f, glm::vec4 color);
 	void createPointCloud();
+	void initKinectTextures();
+	void initVoxelizationTextures();
+	void initImageProcessing();
 	void fetchData();
+	void updateImageProcessing();
 };
 
 #endif

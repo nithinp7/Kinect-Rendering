@@ -8,7 +8,8 @@
 class ShaderResources {
 
 public:
-	Shader* screen;
+	Shader* screenRGBA;
+	Shader* screenGrey;
 	Shader* screenDepth;
 	Shader* point;
 	Shader* line;
@@ -23,6 +24,7 @@ public:
 	Shader* kinectVoxelize;
 	Shader* points2voxels;
 	Shader* bufferSum;
+	Shader* rgba2grey;
 	Shader* test;
 
 	static ShaderResources* get_instance();

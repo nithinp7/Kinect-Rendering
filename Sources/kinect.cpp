@@ -65,55 +65,10 @@ Kinect::Kinect()
 	// allows vertex shader to manipulate point size
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
-	// color camera texture CPU -> GPU
-	glGenTextures(1, &kinect_color_texture);
-	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, color_width, color_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	// depth camera texture CPU -> GPU
-	glGenTextures(1, &kinect_depth_texture);
-	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, depth_width, depth_height, 0, GL_RED, GL_UNSIGNED_SHORT, (GLvoid*)kinect_depth_data);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	// TODO: change to texture buffer ? compare gl_texture_2d with gl_texture_buffer 
-	// point cloud output data GPU -> CPU 
-	glGenTextures(1, &point_cloud_out_tex);
-	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
-	// TODO: check if all these parameters are needed 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2 * points_width, points_height, 0, GL_RGBA, GL_FLOAT, NULL);
-	glBindTexture(GL_TEXTURE_2D, 0); 
-
-	// TODO move to marching cubes class ? 
-	glGenBuffers(1, &cell_buckets_heads_buf);
-	glGenTextures(1, &cell_buckets_heads_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_heads_buf);
-	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * mcubes->num_cells, nullptr, GL_DYNAMIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_heads_tex);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_heads_buf);
-	glBindTexture(GL_TEXTURE_BUFFER, 0);
-
-	// TODO move to marching cubes class ? 
-	glGenBuffers(1, &cell_buckets_nodes_buf);
-	glGenTextures(1, &cell_buckets_nodes_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_nodes_buf);
-	glBufferData(GL_TEXTURE_BUFFER, sizeof(int)* points_width * points_height, nullptr, GL_DYNAMIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_nodes_tex);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_nodes_buf);
-	glBindTexture(GL_TEXTURE_BUFFER, 0);
+	initKinectTextures();
+	initVoxelizationTextures();
+	initImageProcessing();
+	
 
 	shaders->kinectDepthTexture->use();
 	shaders->kinectDepthTexture->setFloat("far_plane", far_plane);
@@ -132,8 +87,6 @@ Kinect::Kinect()
 	shaders->kinectVoxelize->setInt("mcubes_height", mcubes->height);
 	shaders->kinectVoxelize->setInt("mcubes_depth", mcubes->depth);
 
-	shaders->texture->use();
-	shaders->texture->setInt("tex", 2);
 }
 
 Kinect::~Kinect()
@@ -167,6 +120,18 @@ bool Kinect::get_init_error()
 	return init_error_flag;
 }
 
+void Kinect::updateImageProcessing()
+{
+	// convert to grayscale
+	glBindImageTexture(0, kinect_color_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8UI);
+	glBindImageTexture(1, grey_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI);
+
+	shaders->rgba2grey->use();
+
+	glDispatchCompute(color_width, color_height, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
 void Kinect::update()
 {
 	fetchData();
@@ -176,6 +141,8 @@ void Kinect::update()
 
 	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, color_width, color_height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
+	
+	updateImageProcessing();
 }
 
 void Kinect::draw()
@@ -191,7 +158,8 @@ void Kinect::draw()
 	mcubes_model_inv = glm::inverse(mcubes_model);
 
 	if (render_screen_color) {
-		ScreenQuad::draw(shaders->screen, kinect_color_texture);
+		ScreenQuad::draw(shaders->screenGrey, grey_tex);
+		//ScreenQuad::draw(shaders->screenRGBA, kinect_color_texture);
 		return;
 	}
 
@@ -357,6 +325,83 @@ void Kinect::createPointCloud()
 	glVertexAttribIPointer(0, 2, GL_INT, sizeof(glm::ivec2), (void*)0);
 }
 
+void Kinect::initKinectTextures()
+{
+	// color camera texture CPU -> GPU
+	glGenTextures(1, &kinect_color_texture);
+	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, color_width, color_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// depth camera texture CPU -> GPU
+	glGenTextures(1, &kinect_depth_texture);
+	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, depth_width, depth_height, 0, GL_RED, GL_UNSIGNED_SHORT, (GLvoid*)kinect_depth_data);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Kinect::initVoxelizationTextures()
+{
+	// point cloud output data GPU -> CPU 
+	glGenTextures(1, &point_cloud_out_tex);
+	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2 * points_width, points_height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
+	glGenBuffers(1, &cell_buckets_heads_buf);
+	glGenTextures(1, &cell_buckets_heads_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_heads_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * mcubes->num_cells, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_heads_tex);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_heads_buf);
+	glBindTexture(GL_TEXTURE_BUFFER, 0);
+
+	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
+	glGenBuffers(1, &cell_buckets_nodes_buf);
+	glGenTextures(1, &cell_buckets_nodes_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_nodes_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * points_width * points_height, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_nodes_tex);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_nodes_buf);
+	glBindTexture(GL_TEXTURE_BUFFER, 0);
+}
+
+void Kinect::initImageProcessing()
+{
+	// grey texture (GPU only)
+	glGenTextures(1, &grey_tex);
+	glBindTexture(GL_TEXTURE_2D, grey_tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, color_width, color_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// edges texture (GPU only)
+	glGenTextures(1, &edges_tex);
+	glBindTexture(GL_TEXTURE_2D, edges_tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, color_width - 2, color_height - 2, 0, GL_R, GL_UNSIGNED_BYTE, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void Kinect::fetchData()
 {
 	IColorFrame* color_frame = NULL;
@@ -378,8 +423,7 @@ void Kinect::createMeshGPU()
 	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
+
 	glBindImageTexture(2, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	shaders->kinectVoxelize->use();
@@ -389,6 +433,7 @@ void Kinect::createMeshGPU()
 	glDispatchCompute(points_width, points_height, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, point_cloud_out_data);
 
 	// fill voxel buckets, each bucket is a linked list representing the points from the point cloud that landed in that cell

@@ -19,33 +19,41 @@ void ShaderResources::reset_instance()
 ShaderResources::ShaderResources()
 {
 	// regular shader programs (vertex -> frag)
-	screen = new Shader("../KinectSLAM/Shaders/screenShader.vert", "../KinectSLAM/Shaders/screenShader.frag");
-	screenDepth = new Shader("../KinectSLAM/Shaders/kinectDepthScreen.vert", "../KinectSLAM/Shaders/kinectDepthScreen.frag");
-	point = new Shader("../KinectSLAM/Shaders/point.vert", "../KinectSLAM/Shaders/point.frag");
-	line= new Shader("../KinectSLAM/Shaders/line.vert", "../KinectSLAM/Shaders/line.frag");
-	texture = new Shader("../KinectSLAM/Shaders/texture.vert", "../KinectSLAM/Shaders/texture.frag");
-	renderPass = new Shader("../KinectSLAM/Shaders/renderPass.vert", "../KinectSLAM/Shaders/renderPass.frag");
-	skybox = new Shader("../KinectSLAM/Shaders/skybox.vert", "../KinectSLAM/Shaders/skybox.frag");
-	kinectPointCloud = new Shader("../KinectSLAM/Shaders/kinectPointCloud.vert", "../KinectSLAM/Shaders/kinectPointCloud.frag");
-	kinectDepthTexture= new Shader("../KinectSLAM/Shaders/kinectDepthTexture.vert", "../KinectSLAM/Shaders/kinectDepthTexture.frag");
+	screenRGBA = new Shader("../KinectSLAM/Shaders/General/screen.vert", "../KinectSLAM/Shaders/General/screenRGBA.frag");
+	screenGrey = new Shader("../KinectSLAM/Shaders/General/screen.vert", "../KinectSLAM/Shaders/General/screenGrey.frag");
+	screenDepth = new Shader("../KinectSLAM/Shaders/General/screen.vert", "../KinectSLAM/Shaders/Kinect/screenKinectDepth.frag");
+	point = new Shader("../KinectSLAM/Shaders/General/point.vert", "../KinectSLAM/Shaders/General/point.frag");
+	line = new Shader("../KinectSLAM/Shaders/General/line.vert", "../KinectSLAM/Shaders/General/line.frag");
+	texture = new Shader("../KinectSLAM/Shaders/General/texture.vert", "../KinectSLAM/Shaders/General/texture.frag");
+	renderPass = new Shader("../KinectSLAM/Shaders/General/renderPass.vert", "../KinectSLAM/Shaders/General/renderPass.frag");
+	skybox = new Shader("../KinectSLAM/Shaders/General/skybox.vert", "../KinectSLAM/Shaders/General/skybox.frag");
+	kinectPointCloud = new Shader("../KinectSLAM/Shaders/Kinect/kinectPointCloud.vert", "../KinectSLAM/Shaders/Kinect/kinectPointCloud.frag");
+	kinectDepthTexture= new Shader("../KinectSLAM/Shaders/General/texture.vert", "../KinectSLAM/Shaders/Kinect/textureKinectDepth.frag");
 	
 	// shaders including geometry stage (vertex -> geom -> frag)
-	normal = new Shader("../KinectSLAM/Shaders/normal.vert", "../KinectSLAM/Shaders/normal.frag", "../KinectSLAM/Shaders/normal.geom");
+	normal = new Shader("../KinectSLAM/Shaders/General/normal.vert", "../KinectSLAM/Shaders/General/normal.frag", "../KinectSLAM/Shaders/General/normal.geom");
 	// geometry shaders with transform feedback (vertex -> geom) 
 	const GLchar* tf_list[] = { "FragPos", "Normal", "Color" };
-	marchingCubes = new Shader("../KinectSLAM/Shaders/marchingCubes.vert", "../KinectSLAM/Shaders/marchingCubes.frag", "../KinectSLAM/Shaders/marchingCubes.geom", tf_list);
+	marchingCubes = new Shader("../KinectSLAM/Shaders/MarchingCubes/marchingCubes.vert", "../KinectSLAM/Shaders/MarchingCubes/marchingCubes.frag", "../KinectSLAM/Shaders/MarchingCubes/marchingCubes.geom", tf_list);
 
 	// compute shaders 
-	marchingCubesVertsCount = new Shader("../KinectSLAM/Shaders/marchingCubesVertsCount.comp");
-	kinectVoxelize = new Shader("../KinectSLAM/Shaders/kinectVoxelize.comp");
-	points2voxels = new Shader("../KinectSLAM/Shaders/points2voxels.comp");
-	bufferSum = new Shader("../KinectSLAM/Shaders/bufferSum.comp");
+	// marching cubes 
+	marchingCubesVertsCount = new Shader("../KinectSLAM/Shaders/MarchingCubes/marchingCubesVertsCount.comp");
+	// voxelization
+	kinectVoxelize = new Shader("../KinectSLAM/Shaders/Kinect/kinectVoxelize.comp");
+	points2voxels = new Shader("../KinectSLAM/Shaders/Kinect/points2voxels.comp");
+	// gpgpu
+	bufferSum = new Shader("../KinectSLAM/Shaders/GPGPU/bufferSum.comp");
+	// image processing
+	rgba2grey = new Shader("../KinectSLAM/Shaders/ImageProcessing/rgba2grey.comp");
+	// test shaders
 	test = new Shader("../KinectSLAM/Shaders/test.comp");
 }
 
 ShaderResources::~ShaderResources()
 {
-	delete screen;
+	delete screenRGBA;
+	delete screenGrey;
 	delete screenDepth;
 	delete point;
 	delete line;
@@ -60,6 +68,7 @@ ShaderResources::~ShaderResources()
 	delete kinectVoxelize;
 	delete points2voxels;
 	delete bufferSum;
+	delete rgba2grey;
 	delete test;
 }
 
