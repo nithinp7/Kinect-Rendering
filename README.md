@@ -25,11 +25,13 @@ https://youtu.be/stGctuA-qC4
 
 Note the gap artifacts in the second and third picture when the voxel resolution is much smaller than the kinect point cloud spacing. Smoothing gets immediately too expensive if the radius is increased, so I am instead hoping to fix this by aligning multiple frames of point cloud data and stochastically building more complete density fields even on a high resolution voxel field.
 
-![Voxel Resolution 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%206_59_45%20PM.png)
+![Voxel Resolution 1](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2012_6_2020%203_05_32%20PM.png)
 
-![Voxel Resolution 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_15%20PM.png)
+![Voxel Resolution 2](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%206_59_45%20PM.png)
 
-![Voxel Resolution 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_36%20PM.png)
+![Voxel Resolution 3](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_15%20PM.png)
+
+![Voxel Resolution 4](https://github.com/nithinp7/Kinect-Rendering/blob/main/Screenshots/Kinect%20SLAM%2011_26_2020%205_14_36%20PM.png)
 
 ### Update 4:
 
