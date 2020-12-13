@@ -13,6 +13,8 @@ The Kinect Fusion library has already implemented comprehensive photogrammetry a
 
 ### Relevant papers:
 - https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/ismar2011.pdf
+- https://niessnerlab.org/papers/2013/4hashing/niessner2013hashing.pdf
+- http://graphics.stanford.edu/papers/rt_model/rt_model.pdf
 
 ## Progress:
 
