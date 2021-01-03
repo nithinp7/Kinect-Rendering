@@ -15,16 +15,25 @@ public:
 	Shader* line;
 	Shader* normal;
 	Shader* texture;
+	Shader* skybox;
+	Shader* renderPass;
+
 	Shader* marchingCubes;
 	Shader* marchingCubesVertsCount;
-	Shader* renderPass;
-	Shader* skybox;
+
 	Shader* kinectPointCloud;
+	Shader* kinectPointCloudFiltered;
 	Shader* kinectDepthTexture;
-	Shader* kinectVoxelize;
+	Shader* kinectBuckets;
+	Shader* kinectSavePoints;
 	Shader* points2voxels;
+	Shader* buckets2voxels;
+
 	Shader* bufferSum;
+
 	Shader* rgba2grey;
+	Shader* edges;
+	Shader* threshold;
 	Shader* test;
 
 	static ShaderResources* get_instance();

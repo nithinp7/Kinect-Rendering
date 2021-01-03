@@ -51,8 +51,8 @@ Kinect::Kinect()
 	shaders = ShaderResources::get_instance();
 	mcubes = new MarchingCubes(voxels_resolution, voxels_resolution, voxels_resolution);
 
-	voxels_box_scale = (far_plane - near_plane) * 0.25f;
-	voxels_box_translation = glm::vec3(0.0f, 0.0f, -0.5f * (1.75f * near_plane + 0.25f * far_plane));
+	voxels_box_scale = (far_plane - near_plane);
+	voxels_box_translation = glm::vec3(0.0f, 0.0f, -0.5f * (1.0f * near_plane + 1.0f * far_plane));
 
 	createFrustum(&color_frustum, glm::vec4(1, 0, 0, 1));
 	createFrustum(&depth_frustum, glm::vec4(1, 1, 0, 1));
@@ -68,25 +68,28 @@ Kinect::Kinect()
 	initKinectTextures();
 	initVoxelizationTextures();
 	initImageProcessing();
-	
 
+	// TODO: far plane needs to be in a different spot 
 	shaders->kinectDepthTexture->use();
 	shaders->kinectDepthTexture->setFloat("far_plane", far_plane);
 
 	shaders->kinectPointCloud->use();
 	shaders->kinectPointCloud->setFloat("far_plane", far_plane);
 
+	shaders->kinectPointCloudFiltered->use();
+	shaders->kinectPointCloudFiltered->setFloat("far_plane", far_plane);
+
 	shaders->screenDepth->use();
 	shaders->screenDepth->setFloat("far_plane", far_plane);
 		
 	// TODO: move to different spot?
-	shaders->kinectVoxelize->use();
-	shaders->kinectVoxelize->setFloat("far_plane", far_plane);
+	shaders->kinectBuckets->use();
+	shaders->kinectBuckets->setFloat("far_plane", far_plane);
 
-	shaders->kinectVoxelize->setInt("mcubes_width", mcubes->width);
-	shaders->kinectVoxelize->setInt("mcubes_height", mcubes->height);
-	shaders->kinectVoxelize->setInt("mcubes_depth", mcubes->depth);
+	shaders->kinectBuckets->setInt("buckets_width", buckets_width);
 
+	shaders->kinectSavePoints->use();
+	shaders->kinectSavePoints->setFloat("far_plane", far_plane);
 }
 
 Kinect::~Kinect()
@@ -96,8 +99,8 @@ Kinect::~Kinect()
 	free(point_cloud_verts);
 	free(kinect_color_data);
 	free(kinect_depth_data);
-	free(cell_buckets_heads);
-	free(cell_buckets_nodes);
+	free(buckets_heads);
+	free(buckets_nodes);
 	glDeleteVertexArrays(1, &color_frustum.VAO);
 	glDeleteVertexArrays(1, &depth_frustum.VAO);
 	glDeleteVertexArrays(1, &color_frustum.camVAO);
@@ -105,14 +108,10 @@ Kinect::~Kinect()
 	glDeleteTextures(1, &kinect_color_texture);
 	glDeleteTextures(1, &kinect_depth_texture);
 	glDeleteTextures(1, &point_cloud_out_tex);
-	glDeleteTextures(1, &cell_buckets_nodes_tex);
-	glDeleteTextures(1, &cell_buckets_heads_tex);
 	glDeleteBuffers(1, &color_frustum.VBO);
 	glDeleteBuffers(1, &depth_frustum.VBO);
 	glDeleteBuffers(1, &color_frustum.camVBO);
 	glDeleteBuffers(1, &depth_frustum.camVBO);
-	glDeleteBuffers(1, &cell_buckets_heads_buf);
-	glDeleteBuffers(1, &cell_buckets_nodes_buf);
 }
 	
 bool Kinect::get_init_error()
@@ -130,6 +129,25 @@ void Kinect::updateImageProcessing()
 
 	glDispatchCompute(color_width, color_height, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	// run edge detector
+	glBindImageTexture(0, grey_tex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI);
+	glBindImageTexture(1, edges_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI);
+
+	shaders->edges->use();
+
+	glDispatchCompute(color_width - 2, color_height - 2, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	// threshold image 
+	glBindImageTexture(0, edges_tex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI);
+	glBindImageTexture(1, edges_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI);
+
+	shaders->threshold->use();
+	shaders->threshold->setUnsigned("threshold", 80);
+
+	glDispatchCompute(color_width - 2, color_height - 2, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void Kinect::update()
@@ -143,6 +161,24 @@ void Kinect::update()
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, color_width, color_height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)kinect_color_data);
 	
 	updateImageProcessing();
+	updateInput();
+}
+
+void Kinect::updateInput() {
+	if (create_mesh) {
+		createMesh();
+		create_mesh = false;
+	}
+
+	if (save_points) {
+		savePoints();
+		save_points = false;
+	}
+
+	if (clear_points) {
+		clear();
+		clear_points = false;
+	}
 }
 
 void Kinect::draw()
@@ -158,8 +194,8 @@ void Kinect::draw()
 	mcubes_model_inv = glm::inverse(mcubes_model);
 
 	if (render_screen_color) {
-		ScreenQuad::draw(shaders->screenGrey, grey_tex);
-		//ScreenQuad::draw(shaders->screenRGBA, kinect_color_texture);
+		//ScreenQuad::draw(shaders->screenGrey, edges_tex);
+		ScreenQuad::draw(shaders->screenRGBA, kinect_color_texture);
 		return;
 	}
 
@@ -186,7 +222,7 @@ void Kinect::draw()
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
 
-	if (render_point_cloud) {
+	if (1 & render_point_cloud) {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
 		glActiveTexture(GL_TEXTURE1);
@@ -199,7 +235,26 @@ void Kinect::draw()
 		glDrawArrays(GL_POINTS, 0, points_width * points_height);
 	}
 
+	// TODO: remove tmp
+	if (0 & render_point_cloud) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, edges_tex);
+		shaders->kinectPointCloudFiltered->use();
+		shaders->kinectPointCloudFiltered->setMat4("model", model);
+		shaders->kinectPointCloudFiltered->setMat4("mcubes_model_inv", mcubes_model_inv);
+		glPointSize(4.0f);
+		glBindVertexArray(pointCloudVAO);
+		glDrawArrays(GL_POINTS, 0, points_width * points_height);
+	}
+
 	glBindVertexArray(0);
+
+	// add render flag for this
+	registration->draw();
 
 	if (render_mesh) 
 		mcubes->draw_mesh(mcubes_model);
@@ -275,6 +330,8 @@ void Kinect::createPointCloud()
 	points_width = depth_width * x_points_per_pix;
 	points_height = depth_height * y_points_per_pix;
 
+	//TODO: find way to reduce duplicate code 
+
 	shaders->kinectPointCloud->use();
 
 	shaders->kinectPointCloud->setFloat("tan_half_depth_hfov", depth_frustum.tan_half_hfov);
@@ -290,24 +347,57 @@ void Kinect::createPointCloud()
 	shaders->kinectPointCloud->setInt("points_width", points_width);
 	shaders->kinectPointCloud->setInt("points_height", points_height);
 
-	shaders->kinectVoxelize->use();
+	shaders->kinectPointCloudFiltered->use();
 
-	shaders->kinectVoxelize->setFloat("tan_half_depth_hfov", depth_frustum.tan_half_hfov);
-	shaders->kinectVoxelize->setFloat("tan_half_depth_vfov", depth_frustum.tan_half_vfov);
-	shaders->kinectVoxelize->setFloat("tan_half_color_hfov", color_frustum.tan_half_hfov);
-	shaders->kinectVoxelize->setFloat("tan_half_color_vfov", color_frustum.tan_half_vfov);
+	shaders->kinectPointCloudFiltered->setFloat("tan_half_depth_hfov", depth_frustum.tan_half_hfov);
+	shaders->kinectPointCloudFiltered->setFloat("tan_half_depth_vfov", depth_frustum.tan_half_vfov);
+	shaders->kinectPointCloudFiltered->setFloat("tan_half_color_hfov", color_frustum.tan_half_hfov);
+	shaders->kinectPointCloudFiltered->setFloat("tan_half_color_vfov", color_frustum.tan_half_vfov);
 
-	shaders->kinectVoxelize->setVec3("f00", depth_frustum.verts[5]);
-	shaders->kinectVoxelize->setVec3("f10", depth_frustum.verts[6]);
-	shaders->kinectVoxelize->setVec3("f11", depth_frustum.verts[7]);
-	shaders->kinectVoxelize->setVec3("f01", depth_frustum.verts[8]);
+	shaders->kinectPointCloudFiltered->setVec3("f00", depth_frustum.verts[5]);
+	shaders->kinectPointCloudFiltered->setVec3("f10", depth_frustum.verts[6]);
+	shaders->kinectPointCloudFiltered->setVec3("f11", depth_frustum.verts[7]);
+	shaders->kinectPointCloudFiltered->setVec3("f01", depth_frustum.verts[8]);
 
-	shaders->kinectVoxelize->setInt("points_width", points_width);
-	shaders->kinectVoxelize->setInt("points_height", points_height);
+	shaders->kinectPointCloudFiltered->setInt("points_width", points_width);
+	shaders->kinectPointCloudFiltered->setInt("points_height", points_height);
+
+	shaders->kinectBuckets->use();
+
+	shaders->kinectBuckets->setFloat("tan_half_depth_hfov", depth_frustum.tan_half_hfov);
+	shaders->kinectBuckets->setFloat("tan_half_depth_vfov", depth_frustum.tan_half_vfov);
+	shaders->kinectBuckets->setFloat("tan_half_color_hfov", color_frustum.tan_half_hfov);
+	shaders->kinectBuckets->setFloat("tan_half_color_vfov", color_frustum.tan_half_vfov);
+
+	shaders->kinectBuckets->setVec3("f00", depth_frustum.verts[5]);
+	shaders->kinectBuckets->setVec3("f10", depth_frustum.verts[6]);
+	shaders->kinectBuckets->setVec3("f11", depth_frustum.verts[7]);
+	shaders->kinectBuckets->setVec3("f01", depth_frustum.verts[8]);
+
+	shaders->kinectBuckets->setInt("points_width", points_width);
+	shaders->kinectBuckets->setInt("points_height", points_height);
+
+	shaders->kinectSavePoints->use();
+
+	shaders->kinectSavePoints->setFloat("tan_half_depth_hfov", depth_frustum.tan_half_hfov);
+	shaders->kinectSavePoints->setFloat("tan_half_depth_vfov", depth_frustum.tan_half_vfov);
+	shaders->kinectSavePoints->setFloat("tan_half_color_hfov", color_frustum.tan_half_hfov);
+	shaders->kinectSavePoints->setFloat("tan_half_color_vfov", color_frustum.tan_half_vfov);
+
+	shaders->kinectSavePoints->setVec3("f00", depth_frustum.verts[5]);
+	shaders->kinectSavePoints->setVec3("f10", depth_frustum.verts[6]);
+	shaders->kinectSavePoints->setVec3("f11", depth_frustum.verts[7]);
+	shaders->kinectSavePoints->setVec3("f01", depth_frustum.verts[8]);
+
+	shaders->kinectSavePoints->setInt("points_width", points_width);
+	shaders->kinectSavePoints->setInt("points_height", points_height);
+
+	registration = new PointCloudRegistration(points_width * points_height);
 
 	point_cloud_out_data = (glm::vec4*) malloc(sizeof(glm::vec4) * 2 * points_width * points_height);
-	cell_buckets_heads = (int*) malloc(sizeof(int) * mcubes->num_cells);
-	cell_buckets_nodes = (int*) malloc(sizeof(int) * points_width * points_height);
+	
+	buckets_heads = (int*)malloc(sizeof(int) * buckets_size);
+	buckets_nodes = (int*)malloc(sizeof(int) * points_width * points_height);
 
 	point_cloud_verts = (glm::ivec2*) malloc(sizeof(glm::ivec2) * points_width * points_height);
 
@@ -361,21 +451,21 @@ void Kinect::initVoxelizationTextures()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
-	glGenBuffers(1, &cell_buckets_heads_buf);
-	glGenTextures(1, &cell_buckets_heads_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_heads_buf);
-	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * mcubes->num_cells, nullptr, GL_DYNAMIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_heads_tex);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_heads_buf);
+	glGenBuffers(1, &buckets_heads_buf);
+	glGenTextures(1, &buckets_heads_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, buckets_heads_buf);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * buckets_size, nullptr, GL_DYNAMIC_DRAW);
+	glBindTexture(GL_TEXTURE_BUFFER, buckets_heads_tex);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buckets_heads_buf);
 	glBindTexture(GL_TEXTURE_BUFFER, 0);
 
 	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
-	glGenBuffers(1, &cell_buckets_nodes_buf);
-	glGenTextures(1, &cell_buckets_nodes_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_nodes_buf);
+	glGenBuffers(1, &buckets_nodes_buf);
+	glGenTextures(1, &buckets_nodes_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, buckets_nodes_buf);
 	glBufferData(GL_TEXTURE_BUFFER, sizeof(int) * points_width * points_height, nullptr, GL_DYNAMIC_DRAW);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_nodes_tex);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, cell_buckets_nodes_buf);
+	glBindTexture(GL_TEXTURE_BUFFER, buckets_nodes_tex);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buckets_nodes_buf);
 	glBindTexture(GL_TEXTURE_BUFFER, 0);
 }
 
@@ -398,7 +488,7 @@ void Kinect::initImageProcessing()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, color_width - 2, color_height - 2, 0, GL_R, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, color_width - 2, color_height - 2, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -415,7 +505,7 @@ void Kinect::fetchData()
 	if (depth_frame) depth_frame->Release();
 }
 
-void Kinect::createMeshGPU()
+void Kinect::createMesh()
 {
 	viewMesh();
 
@@ -426,9 +516,9 @@ void Kinect::createMeshGPU()
 
 	glBindImageTexture(2, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-	shaders->kinectVoxelize->use();
-	shaders->kinectVoxelize->setMat4("model", model);
-	shaders->kinectVoxelize->setMat4("mcubes_model_inv", mcubes_model_inv);
+	shaders->kinectBuckets->use();
+	shaders->kinectBuckets->setMat4("model", model);
+	shaders->kinectBuckets->setMat4("buckets_model_inv", mcubes_model_inv);
 
 	glDispatchCompute(points_width, points_height, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -439,153 +529,76 @@ void Kinect::createMeshGPU()
 	// fill voxel buckets, each bucket is a linked list representing the points from the point cloud that landed in that cell
 
 	// reset voxel buckets linked lists
-	memset(cell_buckets_heads, 0xff, sizeof(int) * mcubes->num_cells);
-	memset(cell_buckets_nodes, 0xff, sizeof(int) * points_width * points_height);
-
+	memset(buckets_heads, 0xff, sizeof(int) * buckets_size);
+	memset(buckets_nodes, 0xff, sizeof(int) * points_width * points_height);
 	for (int i = 0; i < points_width * points_height; i++) {
 		glm::ivec3 cell = point_cloud_out_data[2 * i];
+		cell = glm::ivec3(cell.x, cell.y, cell.z);
 
 		if (cell.x < 0 || cell.y < 0 || cell.z < 0 ||
-			cell.x >= (mcubes->width - 1) || cell.y >= (mcubes->height - 1) || cell.z >= (mcubes->depth - 1))
+			cell.x >= buckets_width || cell.y >= buckets_width || cell.z >= buckets_width)
 			continue;
 
-		int cell_index = (mcubes->width - 1) * (mcubes->height - 1) * cell.z + (mcubes->width - 1) * cell.y + cell.x;
+		int cell_index = buckets_width * buckets_width * cell.z + buckets_width * cell.y + cell.x;
 		// put the current head of the cell list as the next for this point node 
-		cell_buckets_nodes[i] = cell_buckets_heads[cell_index];
+		buckets_nodes[i] = buckets_heads[cell_index];
 		// put this point node as the new head of the cell list
-		cell_buckets_heads[cell_index] = i;
+		buckets_heads[cell_index] = i;
 	}
 
 	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_heads_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_heads_buf);
-	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(int) * mcubes->num_cells, cell_buckets_heads);
+	glBindTexture(GL_TEXTURE_BUFFER, buckets_heads_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, buckets_heads_buf);
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(int) * buckets_size, buckets_heads);
 
 	glActiveTexture(GL_TEXTURE4);
-	glBindTexture(GL_TEXTURE_BUFFER, cell_buckets_nodes_tex);
-	glBindBuffer(GL_TEXTURE_BUFFER, cell_buckets_nodes_buf);
-	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(int) * points_width * points_height, cell_buckets_nodes);
+	glBindTexture(GL_TEXTURE_BUFFER, buckets_nodes_tex);
+	glBindBuffer(GL_TEXTURE_BUFFER, buckets_nodes_buf);
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(int) * points_width * points_height, buckets_nodes);
 
 	mcubes->bind_voxels_tex_targets();
 
-	shaders->points2voxels->use();
-	shaders->points2voxels->setInt("KERNEL_RADIUS", 2);
-	shaders->points2voxels->setInt("POINTS_WIDTH", points_width);
-	shaders->points2voxels->setInt("POINTS_HEIGHT", points_height);
-	shaders->points2voxels->setInt("WIDTH", mcubes->width);
-	shaders->points2voxels->setInt("HEIGHT", mcubes->height);
-	shaders->points2voxels->setInt("DEPTH", mcubes->depth);
+	shaders->buckets2voxels->use();
+	shaders->buckets2voxels->setInt("POINTS_WIDTH", points_width);
+	shaders->buckets2voxels->setInt("POINTS_HEIGHT", points_height);
+	shaders->buckets2voxels->setInt("BUCKETS_WIDTH", buckets_width);
+	shaders->buckets2voxels->setInt("WIDTH", mcubes->width);
+	shaders->buckets2voxels->setInt("HEIGHT", mcubes->height);
+	shaders->buckets2voxels->setInt("DEPTH", mcubes->depth);
 
 	glDispatchCompute(mcubes->width, mcubes->height, mcubes->depth);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	mcubes->updateGeometry(40, false);
+	mcubes->updateGeometry(20, false);
 }
 
-void Kinect::createMeshCPU() 
-{
-	viewMesh();
-
+void Kinect::savePoints() {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, kinect_depth_texture);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, kinect_color_texture);
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
+
 	glBindImageTexture(2, point_cloud_out_tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-	shaders->kinectVoxelize->use();
-	shaders->kinectVoxelize->setMat4("model", model);
-	shaders->kinectVoxelize->setMat4("mcubes_model_inv", mcubes_model_inv);
+	shaders->kinectSavePoints->use();
+	shaders->kinectSavePoints->setMat4("model", model);
 
-	glDispatchCompute((GLuint)points_width, (GLuint)points_height, (GLuint)1);
-
+	glDispatchCompute(points_width, points_height, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+	glBindTexture(GL_TEXTURE_2D, point_cloud_out_tex);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, point_cloud_out_data);
 
-	// fill voxel buckets, each bucket is a linked list representing the points from the point cloud that landed in that cell
+	if (registration->getModelSet()) {
+		registration->registerToModel(point_cloud_out_data);
+		render_point_cloud = false;
+	} 
+	else
+		registration->setModel(point_cloud_out_data, mcubes_model);
+}
 
-	// reset voxel buckets linked lists
-	memset(cell_buckets_heads, 0xff, sizeof(int) * mcubes->num_cells);
-	memset(cell_buckets_nodes, 0xff, sizeof(int) * points_width * points_height);
-
-	for (int i = 0; i < points_width * points_height; i++) {
-		glm::ivec3 cell = point_cloud_out_data[2 * i];
-
-		if (cell.x < 0 || cell.y < 0 || cell.z < 0 ||
-			cell.x >= (mcubes->width - 1) || cell.y >= (mcubes->height - 1) || cell.z >= (mcubes->depth - 1))
-			continue;
-
-		int cell_index = (mcubes->width - 1) * (mcubes->height - 1) * cell.z + (mcubes->width - 1) * cell.y + cell.x;
-		// put the current head of the cell list as the next for this point node 
-		cell_buckets_nodes[i] = cell_buckets_heads[cell_index];
-		// put this point node as the new head of the cell list
-		cell_buckets_heads[cell_index] = i;
-	}
-	
-	static auto density_contribution_from_cell = [this](int vx, int vy, int vz, int cx, int cy, int cz, float* density_sum, glm::vec4* color_sum)
-	{
-		int cell_index = (cz * (mcubes->height - 1) + cy) * (mcubes->width - 1) + cx;
-		int next = cell_buckets_heads[cell_index];
-
-		while (next != -1)
-		{
-			glm::vec3 pos = point_cloud_out_data[2 * next];
-			glm::vec4 color = point_cloud_out_data[2 * next + 1];
-
-			float dif = glm::length(pos - glm::vec3(vx, vy, vz)) / 2;
-			float w = (1 + 3 * dif) * powf(1 - dif, 3);
-
-			if (dif < 1) {
-				*density_sum += 15.0f * w;
-				*color_sum += 10.0f * color * w;
-			}
-			//*color_sum = color;
-			next = cell_buckets_nodes[next];
-		}
-	};
-
-	static auto check_cell_in_bounds = [this](int cx, int cy, int cz) -> bool
-	{
-		return cx >= 0 && cy >= 0 && cz >= 0 && cx < mcubes->width - 1 && cy < mcubes->height - 1 && cz < mcubes->depth  - 1;
-	};
-
-	// TODO: fix iteration order (cache efficiency?)
-	// TODO: add voxel density calculation on borders as well 
-	for (int x = 0; x < mcubes->width; x++)
-		for (int y = 0; y < mcubes->height; y++)
-			for (int z = 0; z < mcubes->depth; z++) {
-				int index = (z * mcubes->height + y) * mcubes->width + x;
-				float density = 0.0f;
-				// TODO: consider initializing alpha value to 1.0
-				glm::vec4 color = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-				int kernel_size = 2;
-
-				for (int kx = -kernel_size; kx < kernel_size; kx++)
-					for (int ky = -kernel_size; ky < kernel_size; ky++)
-						for (int kz = -kernel_size; kz < kernel_size; kz++)
-							if (check_cell_in_bounds(x + kx, y + ky, z + kz))
-								density_contribution_from_cell(x, y, z, x + kx, y + ky, z + kz, &density, &color);
-
-				// TODO: find better color than black to assign if alpha < EPSILON (maybe set density to zero?)
-				// TODO: normalize in shader, so color can be stochastically accumulated with additional point cloud data 
-				
-				if (color.a > EPSILON)
-					color = color / color.a;
-				color *= 255.0f;
-				//color = glm::vec4(155.0f, 20.0f, 150.0f, 255.0f);
-
-				unsigned int color_packed = ((unsigned int)(unsigned char)color.r) << 24 | 
-											((unsigned int)(unsigned char)color.g) << 16 | 
-											((unsigned int)(unsigned char)color.b) << 8 | 
-											0xff;
-				
-				mcubes->voxels[index] = short(density);
-				mcubes->voxel_colors[index] = color_packed;
-			}
-
-	mcubes->updateGeometry(70, true);
+void Kinect::clear() {
+	registration->clear();
 }
 
 void Kinect::viewPointCloud()
@@ -598,4 +611,18 @@ void Kinect::viewMesh()
 {
 	render_mesh = true;
 	render_point_cloud = false;
+}
+
+void Kinect::setInputFlag(KinectInputFlag flag) {
+	switch (flag) {
+		case KinectInputFlag::CREATE_MESH:
+			create_mesh = true;
+		break;
+		case KinectInputFlag::SAVE_POINTS:
+			save_points = true;
+		break;
+		case KinectInputFlag::CLEAR:
+			clear_points = true;
+		break;
+	}
 }

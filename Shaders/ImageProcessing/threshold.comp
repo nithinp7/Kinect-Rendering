@@ -1,0 +1,14 @@
+#version 430
+
+layout(binding = 0, r8ui) uniform uimage2D img_in;
+layout(binding = 1, r8ui) uniform uimage2D img_out;
+
+uniform unsigned int threshold;
+
+layout(local_size_x = 1, local_size_y = 1) in;
+void main() {
+  ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
+  unsigned int val = unsigned int(imageLoad(img_in, coords).r);
+  val = unsigned int(255 * step(threshold, val));
+  imageStore(img_out, coords, uvec4(val, 0, 0, 0));
+}

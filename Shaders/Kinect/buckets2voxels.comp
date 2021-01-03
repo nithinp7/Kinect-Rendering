@@ -1,0 +1,105 @@
+#version 430
+
+#define EPSILON 1e-4
+
+// input 
+layout(binding = 2, rgba32f) uniform image2D point_cloud;
+layout(binding = 3) uniform isamplerBuffer buckets_heads;
+layout(binding = 4) uniform isamplerBuffer buckets_nodes;
+
+// output
+layout(binding = 0, r16i) uniform iimageBuffer voxels;
+layout(binding = 1, r32ui) uniform uimageBuffer voxels_col;
+
+uniform int BUCKETS_WIDTH;
+
+uniform int POINTS_WIDTH;
+uniform int POINTS_HEIGHT;
+
+uniform int WIDTH;
+uniform int HEIGHT;
+uniform int DEPTH;
+
+void density_contribution_from_cell(vec3 bcoordsf, int cx, int cy, int cz, inout float density_sum, inout vec4 color_sum)
+{
+	int cell_index = (cz * BUCKETS_WIDTH + cy) * BUCKETS_WIDTH + cx;
+	int next = texelFetch(buckets_heads, cell_index).r;
+
+	while (next != -1)
+	{
+		int nextX = (2 * next) % (2 * POINTS_WIDTH);
+		int nextY = next / POINTS_WIDTH;
+		vec3 pos = imageLoad(point_cloud, ivec2(nextX, nextY)).xyz;
+		vec4 color = imageLoad(point_cloud, ivec2(nextX + 1, nextY));
+		
+		float dif = 2.0 * length(pos - bcoordsf);
+		float w = 0;
+
+		if(dif < 1) 
+			w = 2.0 / 3.0 - pow(dif, 2) + 0.5 * pow(dif, 3);
+		else if(dif < 2) 
+			w = 1.0 / 6.0 * pow(2 - dif, 3);
+		
+
+		density_sum += 65.0f * w;
+		color_sum += color * w;
+		/*
+		float dif = 2.0 * length(pos - bcoordsf);
+		float w = (1 + 3 * dif) * pow(1 - dif, 3);
+
+		if (dif < 1) {
+			density_sum += 15.0f * w;
+			color_sum += 10.0f * color * w;
+		}
+		*/
+		
+		next = texelFetch(buckets_nodes, next).r;
+	}
+}
+
+bool check_cell_in_bounds(int cx, int cy, int cz)
+{
+	return cx >= 0 && cy >= 0 && cz >= 0 && cx < BUCKETS_WIDTH && cy < BUCKETS_WIDTH && cz < BUCKETS_WIDTH;
+}
+
+layout(local_size_x = 1, local_size_y = 1) in;
+void main() {
+	// voxel space coords
+	ivec3 vcoords = ivec3(gl_GlobalInvocationID.xyz);
+	// continuous bucket space coords 
+	vec3 bcoordsf = vec3(float(vcoords.x * BUCKETS_WIDTH) / WIDTH, float(vcoords.y * BUCKETS_WIDTH) / HEIGHT, float(vcoords.z * BUCKETS_WIDTH) / DEPTH);
+	// discrete bucket coords 
+	ivec3 bcoordsi = ivec3(bcoordsf);
+	// quadrant within bucket (informs which adjacent buckets to check) 
+	vec3 bquadrant = bcoordsf - bcoordsi;
+
+	int index = vcoords.z * WIDTH * HEIGHT + vcoords.y * WIDTH + vcoords.x;
+	
+	int dx [] = {0, 2 * int(bquadrant.x > 0.5) - 1};
+	int dy [] = {0, 2 * int(bquadrant.y > 0.5) - 1};
+	int dz [] = {0, 2 * int(bquadrant.z > 0.5) - 1};
+
+	float density = 0;
+	vec4 color = vec4(0, 0, 0, 0);
+
+	for(int i = 0; i < 2; ++i)
+		for(int j = 0; j < 2; ++j)
+			for(int k = 0; k < 2; ++k) 
+				if(check_cell_in_bounds(bcoordsi.x + dx[i], bcoordsi.y + dy[j], bcoordsi.z + dz[k]))
+					density_contribution_from_cell(bcoordsf, 
+												   bcoordsi.x + dx[i], bcoordsi.y + dy[j], bcoordsi.z + dz[k], 
+												   density, color);
+
+	if(color.a > EPSILON)
+		color = color / color.a;
+
+	color *= 255;
+
+	unsigned int color_packed = unsigned int(color.r) << 24 | 
+								unsigned int(color.g) << 16 & 0x00ff0000 | 
+								unsigned int(color.b) <<  8 & 0x0000ff00 | 
+								0xff;
+
+	imageStore(voxels, index, ivec4(int(density), 0, 0, 0));
+	imageStore(voxels_col, index, uvec4(color_packed, 0, 0, 0));
+}

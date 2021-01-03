@@ -12,6 +12,7 @@
 #include <resourcesLoader.hpp>
 
 #include <marchingCubes.hpp>
+#include <pointCloudRegistration.hpp>
 
 #include <screenQuad.hpp>
 
@@ -19,6 +20,12 @@
 
 #define PI 3.14159265358979323846  /* pi */
 #define EPSILON 1e-4f
+
+enum class KinectInputFlag {
+	CREATE_MESH,
+	SAVE_POINTS,
+	CLEAR
+};
 
 class Kinect {
 	 
@@ -32,7 +39,7 @@ public:
 	bool render_depth_txt = false;
 	bool render_color_txt = false;
 	bool render_screen_depth = false;
-	bool render_screen_color = true;
+	bool render_screen_color = false;
 
 	// voxels box alignment to point cloud
 	float voxels_box_scale;
@@ -43,15 +50,19 @@ public:
 	bool get_init_error();
 	void update();
 	void draw();
-	void createMeshGPU();
-	void createMeshCPU();
 	void viewPointCloud();
 	void viewMesh();
+	void setInputFlag(KinectInputFlag flag);
 
 private:
 
 	// read only initialization error flag
 	bool init_error_flag = false;
+
+	// input flags
+	bool create_mesh = false;
+	bool save_points = false;
+	bool clear_points = false;
 
 	// render paramaters 
 	glm::mat4 model;
@@ -60,23 +71,27 @@ private:
 	// global shader manager
 	ShaderResources* shaders;
 
-	// custom compute shader, creates point cloud and transforms it into voxel space
-	GLuint kinectVoxelizeShader;
+	// point cloud registration
+	PointCloudRegistration* registration;
+
+	// uniform grid
+	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
+	int* buckets_heads;
+	GLuint buckets_heads_tex;
+	GLuint buckets_heads_buf;
+	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
+	int* buckets_nodes;
+	GLuint buckets_nodes_tex;
+	GLuint buckets_nodes_buf;
+
+	const int buckets_width = 125;
+	const int buckets_size = buckets_width * buckets_width * buckets_width;
 
 	// marching cubes and voxelization related
 	MarchingCubes* mcubes;
 	glm::mat4 mcubes_model;
 	glm::mat4 mcubes_model_inv;
 	const int voxels_resolution = 500;
-
-	// list of linked lists (just the index to head) representing points that landed in each cell [-1 represents no next]
-	int* cell_buckets_heads;
-	GLuint cell_buckets_heads_tex;
-	GLuint cell_buckets_heads_buf;
-	// the point cloud nodes (just the index to next) belonging to the linked lists for each cell [-1 represents no next]
-	int* cell_buckets_nodes;
-	GLuint cell_buckets_nodes_tex;
-	GLuint cell_buckets_nodes_buf;
 
 	// camera textures
 	struct camera_tex_vertex {
@@ -146,8 +161,8 @@ private:
 	GLuint point_cloud_out_tex;
 	int points_width = -1;
 	int points_height = -1;
-	const int x_points_per_pix = 5;
-	const int y_points_per_pix = 5;
+	const int x_points_per_pix = 1;
+	const int y_points_per_pix = 1;
 	unsigned int pointCloudVAO;
 	unsigned int pointCloudVBO;
 
@@ -162,6 +177,10 @@ private:
 	void initImageProcessing();
 	void fetchData();
 	void updateImageProcessing();
+	void updateInput();
+	void createMesh();
+	void savePoints();
+	void clear();
 };
 
 #endif

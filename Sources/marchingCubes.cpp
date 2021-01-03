@@ -94,7 +94,7 @@ void MarchingCubes::updateGeometry(int threshold, bool reupload_voxels)
 		glBindBuffer(GL_TEXTURE_BUFFER, voxel_colors_buf);
 		glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(unsigned int) * grid_size, voxel_colors);
 	}
-
+	
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_BUFFER, tri_table_txt);
 
@@ -165,7 +165,7 @@ void MarchingCubes::draw_mesh(glm::mat4 model)
 	shaders->renderPass->setInt("material.diffuse", 0);
 	shaders->renderPass->setMat4("model", model);
 
-	glm::mat3 normalMatrix(model);
+	glm::mat3 normalMatrix;
 	normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
 	shaders->renderPass->setMat3("normalMatrix", normalMatrix);
 

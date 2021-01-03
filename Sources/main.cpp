@@ -18,7 +18,7 @@ int main()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
 #endif
 
-	std:printf(preamble.c_str());
+	std::printf(preamble.c_str());
 
 	// glfw window creation
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Kinect SLAM", NULL, NULL);
@@ -171,14 +171,16 @@ void processInput(GLFWwindow *window)
 							glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ||
 							glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS ||
-							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+							glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS ||
+							glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
 	if (somethingPressed && last_pressed < currentFrame - 0.5f || last_pressed == 0.0f)
 	{
 		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
-			kinect->createMeshGPU();
+			kinect->setInputFlag(KinectInputFlag::CREATE_MESH);
 		}
 		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			kinect->createMeshCPU();
+
 		}
 		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
 			kinect->viewMesh();
@@ -190,6 +192,15 @@ void processInput(GLFWwindow *window)
 		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
 		{
 			print = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+		{
+			kinect->setInputFlag(KinectInputFlag::SAVE_POINTS);
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+		{
+			kinect->setInputFlag(KinectInputFlag::CLEAR);
 		}
 
 		last_pressed = currentFrame;

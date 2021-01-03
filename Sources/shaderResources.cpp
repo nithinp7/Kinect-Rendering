@@ -28,6 +28,7 @@ ShaderResources::ShaderResources()
 	renderPass = new Shader("../KinectSLAM/Shaders/General/renderPass.vert", "../KinectSLAM/Shaders/General/renderPass.frag");
 	skybox = new Shader("../KinectSLAM/Shaders/General/skybox.vert", "../KinectSLAM/Shaders/General/skybox.frag");
 	kinectPointCloud = new Shader("../KinectSLAM/Shaders/Kinect/kinectPointCloud.vert", "../KinectSLAM/Shaders/Kinect/kinectPointCloud.frag");
+	kinectPointCloudFiltered = new Shader("../KinectSLAM/Shaders/Kinect/kinectPointCloudFiltered.vert", "../KinectSLAM/Shaders/Kinect/kinectPointCloudFiltered.frag");
 	kinectDepthTexture= new Shader("../KinectSLAM/Shaders/General/texture.vert", "../KinectSLAM/Shaders/Kinect/textureKinectDepth.frag");
 	
 	// shaders including geometry stage (vertex -> geom -> frag)
@@ -40,12 +41,17 @@ ShaderResources::ShaderResources()
 	// marching cubes 
 	marchingCubesVertsCount = new Shader("../KinectSLAM/Shaders/MarchingCubes/marchingCubesVertsCount.comp");
 	// voxelization
-	kinectVoxelize = new Shader("../KinectSLAM/Shaders/Kinect/kinectVoxelize.comp");
+	kinectBuckets = new Shader("../KinectSLAM/Shaders/Kinect/kinectBuckets.comp");
 	points2voxels = new Shader("../KinectSLAM/Shaders/Kinect/points2voxels.comp");
+	buckets2voxels = new Shader("../KinectSLAM/Shaders/Kinect/buckets2voxels.comp");
+	// point cloud registration
+	kinectSavePoints = new Shader("../KinectSLAM/Shaders/Kinect/kinectSavePoints.comp");
 	// gpgpu
 	bufferSum = new Shader("../KinectSLAM/Shaders/GPGPU/bufferSum.comp");
 	// image processing
 	rgba2grey = new Shader("../KinectSLAM/Shaders/ImageProcessing/rgba2grey.comp");
+	edges = new Shader("../KinectSLAM/Shaders/ImageProcessing/edges.comp");
+	threshold = new Shader("../KinectSLAM/Shaders/ImageProcessing/threshold.comp");
 	// test shaders
 	test = new Shader("../KinectSLAM/Shaders/test.comp");
 }
@@ -64,11 +70,16 @@ ShaderResources::~ShaderResources()
 	delete renderPass;
 	delete skybox;
 	delete kinectPointCloud;
+	delete kinectPointCloudFiltered;
 	delete kinectDepthTexture;
-	delete kinectVoxelize;
+	delete kinectBuckets;
+	delete kinectSavePoints;
 	delete points2voxels;
+	delete buckets2voxels;
 	delete bufferSum;
 	delete rgba2grey;
+	delete edges;
+	delete threshold;
 	delete test;
 }
 
@@ -101,6 +112,10 @@ void ShaderResources::update(glm::mat4 view, glm::mat4 projection)
 	kinectPointCloud->use();
 	kinectPointCloud->setMat4("view", view);
 	kinectPointCloud->setMat4("projection", projection);
+	
+	kinectPointCloudFiltered->use();
+	kinectPointCloudFiltered->setMat4("view", view);
+	kinectPointCloudFiltered->setMat4("projection", projection);
 
 	kinectDepthTexture->use();
 	kinectDepthTexture->setMat4("view", view);
