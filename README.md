@@ -20,7 +20,7 @@ The Kinect Fusion library has already implemented comprehensive photogrammetry a
 
 ### Update 5:
 
-Marching cubes can now operate on voxel grids as big as 500x500x500 if not bigger. Implemented dynamically sized transform feedback buffer for marching cubes by splitting it into 2 passes (the first to count how much space needs to be allocated, the second to generate the triangles). In doing so, I implemented a parallel array sum in a compute shader which could easily be generalized to a parallel reduce implementation. Note also that I had to set TDR delay to 10 seconds instead of 2 seconds to allow for the long execution time of compute shaders operating on large voxel grid sizes; likely even larger sizes can be used with a higher TDR delay or by splitting compute shader invocations into chunks.
+Marching cubes can now operate on voxel grids as big as 500x500x500 if not bigger. Implemented dynamically sized transform feedback buffer for marching cubes by splitting it into 2 passes (the first to count how much space needs to be allocated, the second to generate the triangles). Note also that I had to set TDR delay to 10 seconds instead of 2 seconds to allow for the long execution time of compute shaders operating on large voxel grid sizes; likely even larger sizes can be used with a higher TDR delay or by splitting compute shader invocations into chunks.
 
 #### YouTube Link:
 https://youtu.be/stGctuA-qC4
